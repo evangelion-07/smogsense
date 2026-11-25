@@ -44,33 +44,33 @@ export function HouseholdPreferencesForm({
   const activityOptions: { value: ActivityTimePreference; label: string; time: string; desc: string }[] = [
     { value: "early_morning", label: "Early Morning", time: "6:00 AM – 8:00 AM", desc: "Dawn workouts & early routines" },
     { value: "mid_morning", label: "Mid-Morning", time: "8:00 AM – 11:00 AM", desc: "Office commute & market runs" },
-    { value: "afternoon", label: "Afternoon", time: "12:00 PM – 4:00 PM", desc: "Daytime errands & solar mixing" },
+    { value: "afternoon", label: "Afternoon", time: "12:00 PM – 4:00 PM", desc: "Daytime errands & routines" },
     { value: "evening", label: "Evening", time: "5:00 PM – 8:00 PM", desc: "Return commute & evening walks" },
     { value: "night", label: "Night", time: "8:00 PM – 11:00 PM", desc: "Post-dinner walks & late transit" },
   ];
 
   const commuteOptions: { value: CommuteMode; label: string; icon: string; desc: string }[] = [
-    { value: "two_wheeler", label: "Two-Wheeler / Bike", icon: "🛵", desc: "Direct roadside air exposure" },
-    { value: "walking", label: "Walking / Cycling", icon: "🚶", desc: "High breathing rate near traffic" },
-    { value: "auto_transit", label: "Auto / Open Bus", icon: "🛺", desc: "Open vehicle in diesel queues" },
-    { value: "metro_rail", label: "Metro / Train", icon: "🚇", desc: "Enclosed, zero local tailpipe" },
-    { value: "car_cab", label: "Private Car / Cab", icon: "🚗", desc: "Enclosed AC cabin (recirculate)" },
+    { value: "two_wheeler", label: "Two-Wheeler / Bike", icon: "🛵", desc: "Roadside conditions vary by route and traffic." },
+    { value: "walking", label: "Walking / Cycling", icon: "🚶", desc: "Conditions vary with route, effort, and traffic." },
+    { value: "auto_transit", label: "Auto / Open Bus", icon: "🛺", desc: "Vehicle type and ventilation vary by service." },
+    { value: "metro_rail", label: "Metro / Train", icon: "🚇", desc: "Conditions vary between travel, stations, and platforms." },
+    { value: "car_cab", label: "Private Car / Cab", icon: "🚗", desc: "Cabin ventilation and traffic can affect conditions." },
   ];
 
   const budgetOptions: { value: BudgetTier; label: string; range: string; desc: string }[] = [
-    { value: "zero", label: "Zero / Free", range: "₹0", desc: "Schedule shifts, damp mopping & towels" },
-    { value: "low", label: "Low Cost", range: "Under ₹500", desc: "Weatherstripping tape & N95 masks" },
-    { value: "moderate", label: "Moderate", range: "₹500 – ₹2,500", desc: "Botanical bio-filters & screen mesh" },
-    { value: "flexible", label: "Flexible", range: "₹2,500+", desc: "True HEPA H13 purifiers & laser monitors" },
+    { value: "zero", label: "No Added Spend", range: "Free actions", desc: "Schedule changes and cleaning with supplies you already have." },
+    { value: "low", label: "Low Cost", range: "Small purchases", desc: "Compare basic supplies or simple gap sealing where appropriate." },
+    { value: "moderate", label: "Moderate Cost", range: "Room for upgrades", desc: "Compare air-cleaner sizing, filter costs, and other options." },
+    { value: "flexible", label: "Flexible Budget", range: "No fixed limit", desc: "Consider higher-cost options only after comparing performance and upkeep." },
   ];
 
   const sensitivityOptions: { key: keyof SensitivityPreferences; label: string; sub: string; icon: string }[] = [
-    { key: "hasChildren", label: "Children & Infants", sub: "Under 12 years (developing lungs)", icon: "👶" },
-    { key: "hasElderly", label: "Seniors (65+ years)", sub: "Cardiovascular & stroke risk", icon: "🧓" },
-    { key: "hasAsthmaOrCardiac", label: "Asthma / Cardiac", sub: "Hyper-reactive airways & COPD", icon: "🫁" },
-    { key: "hasAllergiesOrSinus", label: "Allergies / Sinus", sub: "Eye stinging & nasal rhinitis", icon: "🤧" },
-    { key: "hasPregnancy", label: "Pregnancy", sub: "Prenatal vascular protection", icon: "🤰" },
-    { key: "hasPets", label: "Household Pets", sub: "Near ground-level particulate settling", icon: "🐾" },
+    { key: "hasChildren", label: "Children & Infants", sub: "Children may be more sensitive to air pollution.", icon: "👶" },
+    { key: "hasElderly", label: "Seniors (65+ years)", sub: "May be more affected by air pollution", icon: "🧓" },
+    { key: "hasAsthmaOrCardiac", label: "Asthma / Cardiac", sub: "Respiratory or cardiac condition.", icon: "🫁" },
+    { key: "hasAllergiesOrSinus", label: "Allergies / Sinus", sub: "Individual responses to air pollution vary.", icon: "🤧" },
+    { key: "hasPregnancy", label: "Pregnancy", sub: "Follow local and clinician guidance", icon: "🤰" },
+    { key: "hasPets", label: "Household Pets", sub: "Consider veterinary guidance for a pet with health concerns.", icon: "🐾" },
   ];
 
   const activeSensitivitiesCount = Object.values(preferences.sensitivities).filter(Boolean).length;
@@ -98,22 +98,21 @@ export function HouseholdPreferencesForm({
       <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs space-y-8">
         {/* Fieldset 1: Preferred Outdoor Activity Time */}
         <fieldset className="border-0 p-0 m-0">
-          <div className="flex items-center justify-between mb-3.5">
-            <legend className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+          <legend className="mb-3.5 w-full flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
+            <span className="flex items-center gap-2">
               <ClockIcon className="w-4 h-4 text-emerald-600" />
               <span>1. Preferred Outdoor Routine Window</span>
-            </legend>
-            <span className="text-xs text-slate-400 font-medium hidden sm:inline">Select your primary outdoor window</span>
-          </div>
-          <div role="radiogroup" aria-label="Outdoor routine time window" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5">
+            </span>
+            <span aria-hidden="true" className="text-xs font-medium text-slate-400 hidden sm:inline">Select a time window</span>
+          </legend>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5">
             {activityOptions.map((opt) => {
               const isSelected = preferences.activityTime === opt.value;
               return (
                 <button
                   key={opt.value}
                   type="button"
-                  role="radio"
-                  aria-checked={isSelected}
+                  aria-pressed={isSelected}
                   onClick={() => setActivityTime(opt.value)}
                   className={`p-4 rounded-2xl border text-left transition-all duration-150 cursor-pointer flex flex-col justify-between focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none ${
                     isSelected
@@ -139,22 +138,21 @@ export function HouseholdPreferencesForm({
 
         {/* Fieldset 2: Primary Commute Mode */}
         <fieldset className="border-0 p-0 m-0">
-          <div className="flex items-center justify-between mb-3.5">
-            <legend className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+          <legend className="mb-3.5 w-full flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
+            <span className="flex items-center gap-2">
               <span aria-hidden="true" className="text-base">🚲</span>
               <span>2. Primary Commute &amp; Travel Mode</span>
-            </legend>
-            <span className="text-xs text-slate-400 font-medium hidden sm:inline">Defines exposure level during travel</span>
-          </div>
-          <div role="radiogroup" aria-label="Commute mode selection" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5">
+            </span>
+            <span aria-hidden="true" className="text-xs font-medium text-slate-400 hidden sm:inline">Choose your usual mode</span>
+          </legend>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5">
             {commuteOptions.map((opt) => {
               const isSelected = preferences.commuteMode === opt.value;
               return (
                 <button
                   key={opt.value}
                   type="button"
-                  role="radio"
-                  aria-checked={isSelected}
+                  aria-pressed={isSelected}
                   onClick={() => setCommuteMode(opt.value)}
                   className={`p-4 rounded-2xl border text-left transition-all duration-150 cursor-pointer flex items-start gap-3 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none ${
                     isSelected
@@ -178,22 +176,21 @@ export function HouseholdPreferencesForm({
 
         {/* Fieldset 3: Budget Tier for Interventions */}
         <fieldset className="border-0 p-0 m-0">
-          <div className="flex items-center justify-between mb-3.5">
-            <legend className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+          <legend className="mb-3.5 w-full flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
+            <span className="flex items-center gap-2">
               <span aria-hidden="true" className="text-base">💳</span>
               <span>3. Household Budget for Air Quality Actions</span>
-            </legend>
-            <span className="text-xs text-slate-400 font-medium hidden sm:inline">Filters advice by practical cost</span>
-          </div>
-          <div role="radiogroup" aria-label="Household budget for interventions" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            </span>
+            <span aria-hidden="true" className="text-xs font-medium text-slate-400 hidden sm:inline">Filters advice by practical cost</span>
+          </legend>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             {budgetOptions.map((opt) => {
               const isSelected = preferences.budget === opt.value;
               return (
                 <button
                   key={opt.value}
                   type="button"
-                  role="radio"
-                  aria-checked={isSelected}
+                  aria-pressed={isSelected}
                   onClick={() => setBudget(opt.value)}
                   className={`p-4 rounded-2xl border text-left transition-all duration-150 cursor-pointer flex flex-col justify-between focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none ${
                     isSelected
@@ -216,13 +213,13 @@ export function HouseholdPreferencesForm({
 
         {/* Fieldset 4: Optional Health Sensitivities (Multi-select) */}
         <fieldset className="border-0 p-0 m-0">
-          <div className="flex items-center justify-between mb-3.5">
-            <legend className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+          <legend className="mb-3.5 w-full flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
+            <span className="flex items-center gap-2">
               <HeartPulseIcon className="w-4 h-4 text-rose-500" />
               <span>4. Optional Household Sensitivities ({activeSensitivitiesCount} Selected)</span>
-            </legend>
-            <span className="text-xs text-slate-500 font-medium">Select all relevant profiles</span>
-          </div>
+            </span>
+            <span aria-hidden="true" className="text-xs font-medium text-slate-500">Select relevant profiles</span>
+          </legend>
 
           <div role="group" aria-label="Household sensitivities" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5">
             {sensitivityOptions.map((opt) => {

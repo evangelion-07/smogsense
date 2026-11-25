@@ -111,7 +111,7 @@ export function TailoredRecommendations({
         <InfoIcon className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
         <div className="leading-relaxed text-xs text-amber-950">
           <span className="font-semibold text-amber-950">Air Quality &amp; Timing Guidance: </span>
-          Time window suggestions highlight periods where modeled pollutant concentrations are <strong>relatively lower than morning or evening peaks</strong>. During heavy smog episodes, reduce vigorous outdoor exertion even during lower-pollution windows.
+          Time window suggestions identify the relatively lowest AQI hour in your selected time range or the available forecast. This comparison does not measure personal exposure; during elevated AQI, follow local public-health guidance.
         </div>
       </div>
 
@@ -121,6 +121,8 @@ export function TailoredRecommendations({
           {filterTabs.map((tab) => (
             <button
               key={tab.id}
+              type="button"
+              aria-pressed={selectedFilter === tab.id}
               onClick={() => setSelectedFilter(tab.id)}
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer border ${
                 selectedFilter === tab.id
@@ -177,8 +179,7 @@ export function TailoredRecommendations({
                   </div>
 
                   <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-2.5 text-xs">
-                    <span className="text-xs text-amber-700 font-bold shrink-0">₹</span>
-                    <div className="truncate">
+                    <div className="min-w-0 truncate">
                       <span className="text-slate-500 font-medium">Cost: </span>
                       <strong className="text-slate-800 font-semibold">{rec.cost}</strong>
                     </div>

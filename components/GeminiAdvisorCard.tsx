@@ -32,14 +32,14 @@ export function GeminiAdvisorCard({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-base font-bold text-slate-900 tracking-tight">
-                Personalized Health Advisory
+                AI Air-Quality Explanation
               </h3>
               <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
                 Tailored for You
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Specific guidance tailored to {city.name}&apos;s current air forecast, your transit mode, and your family profile.
+              An optional explanation of {city.name}&apos;s forecast and your selected household routine.
             </p>
           </div>
         </div>
@@ -55,6 +55,10 @@ export function GeminiAdvisorCard({
         </button>
       </div>
 
+      <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+        If you request an AI explanation, this forecast and your selected household preferences, including optional health sensitivities, are sent to Google Gemini. This is optional; the rule-based recommendations remain available below.
+      </p>
+
       {/* Loading Skeleton */}
       {isLoading && (
         <div className="py-10 text-center space-y-3">
@@ -63,7 +67,7 @@ export function GeminiAdvisorCard({
             Preparing your personalized advisory...
           </div>
           <p className="text-xs text-slate-500 max-w-md mx-auto">
-            Analyzing local particulate trends, your travel habits, and health sensitivities to build an optimal routine.
+            Summarizing the available forecast and your selected preferences.
           </p>
         </div>
       )}

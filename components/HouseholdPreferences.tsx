@@ -25,30 +25,30 @@ export function HouseholdPreferences({
   const activeCount = Object.values(preferences).filter(Boolean).length;
 
   const getVulnerabilitySeverity = () => {
-    if (city.aqi > 300) {
+    if (["Very Unhealthy", "Hazardous", "Beyond AQI", "Severe"].includes(city.category)) {
       return {
-        level: "Extreme Risk Level",
+        level: "High AQI category",
         color: "text-rose-700",
         border: "border-rose-200",
         bg: "bg-rose-50",
-        text: "With current Severe AQI, active household profiles face critical systemic inflammation risk. Limit outdoor exposure to essential transit only.",
+        text: "This AQI category is high on the selected scale. Check nearby readings and local public-health guidance.",
       };
     }
-    if (city.aqi > 150) {
+    if (["Unhealthy", "Unhealthy for Sensitive Groups", "Very Poor", "Poor"].includes(city.category)) {
       return {
-        level: "Elevated Risk Level",
+        level: "Elevated AQI category",
         color: "text-amber-800",
         border: "border-amber-200",
         bg: "bg-amber-50",
-        text: "Sensitive members must prioritize indoor filtered air and wear certified masks during travel.",
+        text: "People who may be more sensitive should check local public-health guidance and follow advice from their clinician.",
       };
     }
     return {
-      level: "Low / Controlled Risk",
+        level: "Lower AQI category",
       color: "text-emerald-700",
       border: "border-emerald-200",
       bg: "bg-emerald-50",
-      text: "Air quality is favorable. Outdoor recreation and natural ventilation are safe for all household members.",
+      text: "The modeled AQI is lower, but a city forecast cannot establish conditions at a specific home or an individual's health risk.",
     };
   };
 
@@ -64,44 +64,44 @@ export function HouseholdPreferences({
     {
       key: "hasChildren",
       label: "Children & Infants",
-      sublabel: "Higher breathing frequency, developing lungs",
+      sublabel: "May be more sensitive to air-pollution exposure",
       icon: <BabyIcon className="w-5 h-5 text-sky-600" />,
-      tag: "Pediatric Vulnerability",
+      tag: "Sensitivity can vary",
     },
     {
       key: "hasElderly",
       label: "Seniors (65+ years)",
-      sublabel: "Higher susceptibility to cardiac stress & stroke",
+      sublabel: "May be more affected by air pollution",
       icon: <UsersIcon className="w-5 h-5 text-purple-600" />,
-      tag: "Cardiovascular Risk",
+      tag: "Sensitivity can vary",
     },
     {
       key: "hasRespiratoryCondition",
-      label: "Asthma / Cardiac Condition",
-      sublabel: "Hyper-reactive airways, COPD, or heart disease",
+      label: "Asthma or heart / lung condition",
+      sublabel: "Personalized advice may be important",
       icon: <HeartPulseIcon className="w-5 h-5 text-rose-600" />,
-      tag: "Immediate Trigger Risk",
+      tag: "Follow clinical guidance",
     },
     {
       key: "isOutdoorAthlete",
-      label: "Outdoor Athletes / Runners",
-      sublabel: "10-20x higher air intake during intense workout",
+      label: "Frequent strenuous outdoor activity",
+      sublabel: "Activity duration can affect exposure",
       icon: <ActivityIcon className="w-5 h-5 text-amber-600" />,
-      tag: "Deep Lung Intake",
+      tag: "Activity pattern",
     },
     {
       key: "hasPets",
       label: "Household Pets",
-      sublabel: "Closer to ground-level particulate settling",
+      sublabel: "Ask a veterinarian about pet-specific concerns",
       icon: <span className="text-lg">🐾</span>,
-      tag: "Ground Dust Exposure",
+      tag: "Pet considerations",
     },
     {
       key: "isDailyCommuter",
-      label: "Two-Wheeler / Pedestrian Commuter",
-      sublabel: "High roadside black carbon & exhaust inhalation",
+      label: "Regular roadside travel",
+      sublabel: "Traffic and route conditions can change exposure",
       icon: <span className="text-lg">🛵</span>,
-      tag: "Roadside Fleet Exposure",
+      tag: "Travel pattern",
     },
   ];
 
@@ -116,7 +116,7 @@ export function HouseholdPreferences({
             </span>
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Toggle your household members to automatically recalibrate alerts, mask ratings, and the Daily Action Plan below.
+            Toggle relevant household preferences to update the vulnerability note and Daily Action Plan below.
           </p>
         </div>
         <div className="text-[11px] text-slate-500 mt-2 sm:mt-0 flex items-center gap-1.5">
@@ -133,6 +133,8 @@ export function HouseholdPreferences({
             return (
               <button
                 key={opt.key}
+                type="button"
+                aria-pressed={isChecked}
                 onClick={() => toggle(opt.key)}
                 className={`p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex items-start gap-3.5 relative overflow-hidden group ${
                   isChecked

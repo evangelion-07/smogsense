@@ -44,7 +44,7 @@ export function MethodologySection() {
               1. Atmospheric Model vs. Sensors
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Open-Meteo values derive from numerical chemistry dispersion models (CAMS / NOAA) calculated on a regional grid, representing area-averaged atmospheric estimates rather than micro-local physical ground station measurements.
+              Open-Meteo air-quality forecasts use CAMS European or CAMS Global model data, depending on location. They are grid estimates rather than measurements from a nearby ground station.
             </p>
           </div>
 
@@ -62,7 +62,7 @@ export function MethodologySection() {
               3. Relative Exposure Principle
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
-              No outdoor time is labeled as &quot;completely safe&quot; during high smog periods. SmogSense algorithmically calculates intervals where predicted concentrations are <strong>relatively lower</strong> compared to morning/evening inversions.
+              SmogSense compares the available hourly model AQI values and identifies a relatively lower forecast hour. This is a comparison within the forecast, not a street-level reading or a guarantee about personal exposure.
             </p>
           </div>
         </div>
@@ -72,55 +72,55 @@ export function MethodologySection() {
           <div id="methodology-details" className="mt-6 pt-6 border-t border-slate-100 space-y-6 animate-fadeIn text-xs text-slate-600">
             {/* Breakpoints Table */}
             <div>
-              <h3 className="text-sm font-bold text-slate-900 mb-2">
-                Comparative Standards: WHO 2021 vs. CPCB India vs. US EPA
+                <h3 className="text-sm font-bold text-slate-900 mb-2">
+                Guideline and Standard References: WHO 2021 and CPCB
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse border border-slate-200 rounded-xl overflow-hidden font-sans">
                   <thead>
                     <tr className="bg-slate-50 text-slate-700 text-[11px] font-mono uppercase border-b border-slate-200">
                       <th className="p-2.5">Pollutant</th>
-                      <th className="p-2.5">WHO 24h Guideline</th>
-                      <th className="p-2.5">CPCB 24h Standard (India)</th>
-                      <th className="p-2.5">Primary Target Organ / Effect</th>
+                      <th className="p-2.5">WHO Guideline (period)</th>
+                      <th className="p-2.5">CPCB Standard (period)</th>
+                      <th className="p-2.5">General health context</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     <tr className="hover:bg-slate-50/60">
                       <td className="p-2.5 font-bold text-slate-900">PM2.5</td>
-                      <td className="p-2.5 text-emerald-700 font-mono">15 µg/m³</td>
-                      <td className="p-2.5 text-amber-800 font-mono">60 µg/m³</td>
-                      <td className="p-2.5 text-slate-600">Deep alveolar penetration, cardiovascular inflammation</td>
+                      <td className="p-2.5 text-emerald-700 font-mono">24h: 15 µg/m³</td>
+                      <td className="p-2.5 text-amber-800 font-mono">24h: 60 µg/m³</td>
+                      <td className="p-2.5 text-slate-600">Associated with respiratory and cardiovascular effects; responses vary with exposure and person.</td>
                     </tr>
                     <tr className="hover:bg-slate-50/60">
                       <td className="p-2.5 font-bold text-slate-900">PM10</td>
-                      <td className="p-2.5 text-emerald-700 font-mono">45 µg/m³</td>
-                      <td className="p-2.5 text-amber-800 font-mono">100 µg/m³</td>
-                      <td className="p-2.5 text-slate-600">Upper respiratory irritation, nasal dryness, bronchitis</td>
+                      <td className="p-2.5 text-emerald-700 font-mono">24h: 45 µg/m³</td>
+                      <td className="p-2.5 text-amber-800 font-mono">24h: 100 µg/m³</td>
+                      <td className="p-2.5 text-slate-600">Particle exposure can cause respiratory symptoms; effects vary with exposure and person.</td>
                     </tr>
                     <tr className="hover:bg-slate-50/60">
                       <td className="p-2.5 font-bold text-slate-900">NO₂</td>
-                      <td className="p-2.5 text-emerald-700 font-mono">25 µg/m³</td>
-                      <td className="p-2.5 text-amber-800 font-mono">80 µg/m³</td>
-                      <td className="p-2.5 text-slate-600">Airway hyper-responsiveness, asthma triggers</td>
+                      <td className="p-2.5 text-emerald-700 font-mono">24h: 25 µg/m³</td>
+                      <td className="p-2.5 text-amber-800 font-mono">24h: 80 µg/m³</td>
+                      <td className="p-2.5 text-slate-600">Can irritate airways and aggravate existing respiratory conditions.</td>
                     </tr>
                     <tr className="hover:bg-slate-50/60">
                       <td className="p-2.5 font-bold text-slate-900">SO₂</td>
-                      <td className="p-2.5 text-emerald-700 font-mono">40 µg/m³</td>
-                      <td className="p-2.5 text-amber-800 font-mono">80 µg/m³</td>
-                      <td className="p-2.5 text-slate-600">Mucus membrane irritation, coughing spasms</td>
+                      <td className="p-2.5 text-emerald-700 font-mono">24h: 40 µg/m³</td>
+                      <td className="p-2.5 text-amber-800 font-mono">24h: 80 µg/m³</td>
+                      <td className="p-2.5 text-slate-600">Can cause breathing symptoms, especially for people with asthma.</td>
                     </tr>
                     <tr className="hover:bg-slate-50/60">
                       <td className="p-2.5 font-bold text-slate-900">CO</td>
-                      <td className="p-2.5 text-emerald-700 font-mono">4.0 mg/m³</td>
-                      <td className="p-2.5 text-amber-800 font-mono">4.0 mg/m³</td>
-                      <td className="p-2.5 text-slate-600">Carboxyhemoglobin formation, reduced oxygen delivery</td>
+                      <td className="p-2.5 text-emerald-700 font-mono">24h: 4.0 mg/m³</td>
+                      <td className="p-2.5 text-amber-800 font-mono">8h: 2.0 mg/m³</td>
+                      <td className="p-2.5 text-slate-600">At high concentrations, carbon monoxide can reduce oxygen delivery in the body.</td>
                     </tr>
                     <tr className="hover:bg-slate-50/60">
                       <td className="p-2.5 font-bold text-slate-900">O₃ (8h)</td>
-                      <td className="p-2.5 text-emerald-700 font-mono">100 µg/m³</td>
-                      <td className="p-2.5 text-amber-800 font-mono">100 µg/m³</td>
-                      <td className="p-2.5 text-slate-600">Oxidative airway stress during intense midday sun</td>
+                      <td className="p-2.5 text-emerald-700 font-mono">8h: 100 µg/m³</td>
+                      <td className="p-2.5 text-amber-800 font-mono">8h: 100 µg/m³</td>
+                      <td className="p-2.5 text-slate-600">Can irritate lungs and aggravate asthma symptoms.</td>
                     </tr>
                   </tbody>
                 </table>
@@ -133,7 +133,7 @@ export function MethodologySection() {
               <ul className="list-disc list-inside space-y-1.5 text-slate-600 text-[11px] leading-relaxed">
                 <li>
                   <strong className="text-slate-800">Open-Meteo Air Quality API: </strong>
-                  Free open-access weather API providing forecasts from the European Centre for Medium-Range Weather Forecasts (ECMWF) and Copernicus Atmosphere Monitoring Service (CAMS). Available under the Open Database License (ODbL).
+                  Open-Meteo Air Quality API serving modeled forecasts based on CAMS European and CAMS Global data. Available under the Open Database License (ODbL).
                 </li>
                 <li>
                   <strong className="text-slate-800">World Health Organization (WHO): </strong>
@@ -141,7 +141,7 @@ export function MethodologySection() {
                 </li>
                 <li>
                   <strong className="text-slate-800">Central Pollution Control Board (CPCB): </strong>
-                  Ministry of Environment, Forest and Climate Change, Government of India: National Air Quality Index (NAQI) technical report and CAAQMS guidelines.
+                  Ministry of Environment, Forest and Climate Change, Government of India: National Ambient Air Quality Standards (NAAQS, 2009) and National Air Quality Index technical report.
                 </li>
                 <li>
                   <strong className="text-slate-800">Health Advisory Engine: </strong>

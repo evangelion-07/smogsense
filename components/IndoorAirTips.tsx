@@ -10,7 +10,7 @@ export function IndoorAirTips() {
   const categories = [
     { id: "all", label: "All Tips" },
     { id: "purifier", label: "Air Purifiers" },
-    { id: "plants", label: "Plants & Bio-Filters" },
+    { id: "plants", label: "Houseplants" },
     { id: "ventilation", label: "Ventilation" },
     { id: "cleaning", label: "Cleaning & Dust" },
     { id: "cooking", label: "Kitchen & Cooking" },
@@ -54,6 +54,8 @@ export function IndoorAirTips() {
         {categories.map((cat) => (
           <button
             key={cat.id}
+            type="button"
+            aria-pressed={selectedCategory === cat.id}
             onClick={() => setSelectedCategory(cat.id)}
             className={`px-3 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer border ${
               selectedCategory === cat.id

@@ -2,13 +2,12 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { CityData, GeocodedCity } from "../lib/types";
+import { SAMPLE_CITIES } from "../lib/sampleData";
 import { searchCities, PRESET_CITIES } from "../services/airQualityService";
 import {
-  MapPinIcon,
   RefreshCwIcon,
   SearchIcon,
   AlertTriangleIcon,
-  InfoIcon,
 } from "./Icons";
 
 interface CitySelectorProps {
@@ -42,10 +41,11 @@ export function CitySelector({
   const [searchError, setSearchError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [showModelNote, setShowModelNote] = useState(false);
+  const [activeOptionIndex, setActiveOptionIndex] = useState(-1);
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchRequestId = useRef(0);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -55,17 +55,41 @@ export function CitySelector({
         !searchContainerRef.current.contains(event.target as Node)
       ) {
         setShowDropdown(false);
+        setActiveOptionIndex(-1);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const handleSelectCity = (city: GeocodedCity) => {
+    setShowDropdown(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setSearchError(null);
+    setHasSearched(false);
+    setActiveOptionIndex(-1);
+    searchRequestId.current += 1;
+    onSelectSearchResult(city);
+  };
+
   // Handle keyboard escape
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Escape") {
       setShowDropdown(false);
-      searchInputRef.current?.blur();
+      setActiveOptionIndex(-1);
+    } else if (e.key === "ArrowDown" && searchResults.length > 0) {
+      e.preventDefault();
+      setShowDropdown(true);
+      setActiveOptionIndex((current) => (current + 1) % searchResults.length);
+    } else if (e.key === "ArrowUp" && searchResults.length > 0) {
+      e.preventDefault();
+      setShowDropdown(true);
+      setActiveOptionIndex((current) => current <= 0 ? searchResults.length - 1 : current - 1);
+    } else if (e.key === "Enter" && showDropdown && activeOptionIndex >= 0) {
+      e.preventDefault();
+      const selected = searchResults[activeOptionIndex];
+      if (selected) handleSelectCity(selected);
     }
   };
 
@@ -77,170 +101,31 @@ export function CitySelector({
 
     setIsSearching(true);
     setSearchError(null);
+    setSearchResults([]);
     setHasSearched(true);
     setShowDropdown(true);
+    setActiveOptionIndex(-1);
+    const requestId = ++searchRequestId.current;
 
     try {
       const results = await searchCities(query);
+      if (requestId !== searchRequestId.current) return;
       setSearchResults(results);
     } catch (err: unknown) {
+      if (requestId !== searchRequestId.current) return;
       setSearchError(err instanceof Error ? err.message : "Failed to search cities");
       setSearchResults([]);
     } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleSelectCity = (city: GeocodedCity) => {
-    setShowDropdown(false);
-    setSearchQuery("");
-    setHasSearched(false);
-    onSelectSearchResult(city);
-  };
-
-  const getAqiBadge = (category: string) => {
-    switch (category) {
-      case "Good":
-        return "bg-emerald-100 text-emerald-800 border-emerald-300";
-      case "Satisfactory":
-        return "bg-lime-100 text-lime-800 border-lime-300";
-      case "Moderate":
-        return "bg-amber-100 text-amber-800 border-amber-300";
-      case "Poor":
-        return "bg-orange-100 text-orange-800 border-orange-300";
-      case "Very Poor":
-        return "bg-rose-100 text-rose-800 border-rose-300";
-      case "Severe":
-      default:
-        return "bg-purple-100 text-purple-800 border-purple-300";
+      if (requestId === searchRequestId.current) setIsSearching(false);
     }
   };
 
   return (
-    <section aria-label="City Selection and Controls" className="w-full bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-xs space-y-5">
-      {/* Top Header Row: Current Location & Source Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0">
-            <MapPinIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-                {selectedCity.name}
-              </h1>
-              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${getAqiBadge(selectedCity.category)}`}>
-                AQI {selectedCity.aqi} • {selectedCity.category}
-              </span>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-0.5 font-medium">
-              <span>{selectedCity.stateOrRegion}</span>
-              <span>•</span>
-              <span className="font-mono text-[11px]">
-                {selectedCity.coordinates.lat.toFixed(2)}°N, {selectedCity.coordinates.lng.toFixed(2)}°E
-              </span>
-              {selectedCity.metadata?.fetchedAt && (
-                <>
-                  <span>•</span>
-                  <span className="font-mono text-[11px]">Updated {selectedCity.metadata.fetchedAt}</span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Source Toggle & Refresh */}
-        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
-          {/* Mode Switch Tabs */}
-          <div role="tablist" aria-label="Data source selection" className="inline-flex rounded-xl p-1 bg-slate-100 border border-slate-200">
-            <button
-              role="tab"
-              aria-selected={isLiveApiMode}
-              onClick={() => onToggleApiMode(true)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none ${
-                isLiveApiMode
-                  ? "bg-white text-emerald-800 font-semibold shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${isLiveApiMode ? "bg-emerald-600" : "bg-slate-300"}`} />
-              Live Forecast
-            </button>
-            <button
-              role="tab"
-              aria-selected={!isLiveApiMode}
-              onClick={() => onToggleApiMode(false)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none ${
-                !isLiveApiMode
-                  ? "bg-white text-slate-900 font-semibold shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Curated Demo
-            </button>
-          </div>
-
-          <button
-            onClick={onRefresh}
-            disabled={isLoading}
-            aria-label="Refresh air quality data"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-95 text-xs font-medium text-slate-700 border border-slate-200 shadow-2xs transition cursor-pointer disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none"
-            title="Refresh air quality data"
-          >
-            <RefreshCwIcon className={`w-3.5 h-3.5 text-emerald-600 ${isLoading ? "animate-spin" : ""}`} />
-            <span>{isLoading ? "Fetching..." : "Refresh"}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Model Estimate Alert Banner (Clean & Subtle Ribbon with Expand toggle) */}
-      {isLiveApiMode && (
-        <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-amber-900 text-xs flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <InfoIcon className="w-4 h-4 text-amber-600 shrink-0" />
-            <span className="leading-snug">
-              <strong>Open-Meteo Model Estimates:</strong> Atmospheric dispersion forecast (US EPA scale), not direct ground sensors.
-            </span>
-          </div>
-          <button
-            onClick={() => setShowModelNote(!showModelNote)}
-            className="text-[11px] font-semibold text-amber-800 hover:text-amber-950 underline shrink-0 cursor-pointer"
-          >
-            {showModelNote ? "Less" : "Learn more"}
-          </button>
-        </div>
-      )}
-
-      {showModelNote && isLiveApiMode && (
-        <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed animate-fadeIn">
-          Values shown are atmospheric dispersion model forecasts (CAMS / NOAA) at grid resolution. They represent numerical model estimates, <strong>not direct regulatory ground sensor readings</strong>. The AQI shown is on the <strong>US EPA AQI</strong> scale and is <strong>not India’s official CPCB National Air Quality Index (NAQI)</strong>.
-        </div>
-      )}
-
-      {/* API Error Notification */}
-      {apiError && (
-        <div role="alert" className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-start justify-between gap-3 animate-fadeIn">
-          <div className="flex items-start gap-2.5">
-            <AlertTriangleIcon className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold text-rose-950">Open-Meteo API Notice: </span>
-              {apiError}
-            </div>
-          </div>
-          <button
-            onClick={onClearError}
-            aria-label="Dismiss error notice"
-            className="text-slate-700 hover:text-slate-900 text-xs px-2.5 py-1 rounded bg-white border border-slate-200 shadow-2xs cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {/* Search Input & Preset Pills (Spacious 2-tier layout) */}
-      <div className="space-y-3.5 pt-1">
-        {/* Full-width Search Bar */}
-        <div className="relative" ref={searchContainerRef}>
+    <section aria-label="City Search" className="w-full space-y-3">
+      {/* Search Input Row with Live / Demo & Refresh Controls */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+        {/* Search Bar */}
+        <div className="relative flex-1" ref={searchContainerRef}>
           <form onSubmit={handleSearch} className="relative flex items-center">
             <div className="absolute left-3.5 text-slate-400 pointer-events-none">
               <SearchIcon className="w-4 h-4" />
@@ -249,39 +134,48 @@ export function CitySelector({
               ref={searchInputRef}
               type="text"
               role="combobox"
-              aria-expanded={showDropdown}
-              aria-controls="city-search-results"
-              aria-label="Search city name worldwide"
+              aria-expanded={showDropdown && !isSearching && searchResults.length > 0}
+              aria-controls={showDropdown && searchResults.length > 0 ? "city-search-results" : undefined}
+              aria-activedescendant={activeOptionIndex >= 0 ? `city-option-${activeOptionIndex}` : undefined}
+              aria-autocomplete="list"
+              aria-busy={isSearching}
+              aria-label="Search city worldwide"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                searchRequestId.current += 1;
+                setIsSearching(false);
+                setSearchResults([]);
+                setSearchError(null);
+                setHasSearched(false);
+                setActiveOptionIndex(-1);
+                setShowDropdown(false);
+              }}
               onFocus={() => {
                 if (searchResults.length > 0) setShowDropdown(true);
               }}
               onKeyDown={handleKeyDown}
-              placeholder="Search any worldwide city (e.g. London, Paris, Tokyo, Mumbai, New York)..."
-              className="w-full pl-10 pr-28 py-3 bg-slate-50 hover:bg-slate-50/80 focus:bg-white border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition shadow-2xs"
+              placeholder="Search any city worldwide (e.g. London, Tokyo, Delhi, New York)..."
+              className="w-full pl-10 pr-24 py-2.5 bg-white border border-slate-200 hover:border-slate-300 focus:border-emerald-500 rounded-2xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition shadow-xs"
             />
             <button
               type="submit"
               disabled={isSearching || searchQuery.trim().length < 2}
-              className="absolute right-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-xl text-xs font-semibold transition cursor-pointer shadow-2xs focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none"
+              className="absolute right-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-100 disabled:text-slate-400 text-white rounded-xl text-xs font-semibold transition cursor-pointer disabled:cursor-not-allowed"
             >
-              {isSearching ? "Searching..." : "Search City"}
+              {isSearching ? "Searching..." : "Search"}
             </button>
           </form>
 
           {/* Search Results Dropdown */}
           {showDropdown && (
             <div
-              id="city-search-results"
-              role="listbox"
-              aria-label="City search suggestions"
-              className="absolute top-full left-0 right-0 mt-2 z-50 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden max-h-64 overflow-y-auto"
+              className="absolute top-full left-0 right-0 mt-2 z-50 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden"
             >
               {isSearching && (
-                <div className="p-4 text-center text-xs text-slate-600 font-medium">
+                <div role="status" className="p-4 text-center text-xs text-slate-500">
                   <div className="inline-block w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mb-1" />
-                  <div>Searching global geocoding database...</div>
+                  <div>Searching locations...</div>
                 </div>
               )}
 
@@ -292,33 +186,38 @@ export function CitySelector({
               )}
 
               {!isSearching && hasSearched && searchResults.length === 0 && !searchError && (
-                <div className="p-4 text-center text-xs text-slate-600">
-                  No matching cities found for &quot;{searchQuery}&quot;. Please try another spelling or nearby city.
+                <div role="status" className="p-4 text-center text-xs text-slate-500">
+                  No cities found for &quot;{searchQuery}&quot;.
                 </div>
               )}
 
               {!isSearching && searchResults.length > 0 && (
-                <div className="divide-y divide-slate-100">
-                  <div className="px-3.5 py-2 text-[10px] font-mono text-slate-500 uppercase bg-slate-50 font-bold">
-                    Matching Locations ({searchResults.length})
-                  </div>
-                  {searchResults.map((result) => (
+                <div
+                  id="city-search-results"
+                  role="listbox"
+                  aria-label="City suggestions"
+                  className="max-h-60 overflow-y-auto divide-y divide-slate-100"
+                >
+                  {searchResults.map((result, index) => (
                     <button
                       key={result.id}
+                      id={`city-option-${index}`}
                       role="option"
-                      aria-selected={false}
+                      aria-selected={activeOptionIndex === index}
+                      tabIndex={-1}
+                      onMouseEnter={() => setActiveOptionIndex(index)}
                       onClick={() => handleSelectCity(result)}
-                      className="w-full text-left p-3.5 hover:bg-slate-50 transition flex items-center justify-between group cursor-pointer focus-visible:bg-slate-50 focus-visible:outline-none"
+                      className="w-full text-left p-3 hover:bg-slate-50 transition flex items-center justify-between cursor-pointer"
                     >
                       <div>
-                        <div className="text-xs font-bold text-slate-900 group-hover:text-emerald-700">
+                        <span className="text-xs font-semibold text-slate-900">
                           {result.name}
-                        </div>
-                        <div className="text-[11px] text-slate-500">
+                        </span>
+                        <span className="text-xs text-slate-400 ml-1.5">
                           {[result.admin1, result.country].filter(Boolean).join(", ")}
-                        </div>
+                        </span>
                       </div>
-                      <span className="text-[10px] font-mono text-slate-400">
+                      <span className="text-[11px] font-mono text-slate-400">
                         {result.latitude.toFixed(2)}°, {result.longitude.toFixed(2)}°
                       </span>
                     </button>
@@ -329,50 +228,88 @@ export function CitySelector({
           )}
         </div>
 
-        {/* Preset City Quick Pills */}
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 mr-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            Quick Presets:
-          </span>
+        {/* Mode Switch & Refresh */}
+        <div className="flex items-center gap-1.5 self-end sm:self-auto">
+          <div className="inline-flex rounded-xl p-0.5 bg-slate-100 border border-slate-200">
+            <button
+              onClick={() => onToggleApiMode(true)}
+              aria-pressed={isLiveApiMode}
+              className={`px-2.5 py-1.5 text-xs font-medium rounded-lg transition cursor-pointer ${
+                isLiveApiMode
+                  ? "bg-white text-emerald-800 font-semibold shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Live
+            </button>
+            <button
+              onClick={() => onToggleApiMode(false)}
+              aria-pressed={!isLiveApiMode}
+              className={`px-2.5 py-1.5 text-xs font-medium rounded-lg transition cursor-pointer ${
+                !isLiveApiMode
+                  ? "bg-white text-slate-900 font-semibold shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Demo
+            </button>
+          </div>
 
-          {PRESET_CITIES.map((city) => {
-            const isSelected = selectedCity.name.toLowerCase().includes(city.name.toLowerCase());
-
-            return (
-              <button
-                key={city.id}
-                aria-pressed={isSelected}
-                onClick={() => {
-                  if (isLiveApiMode) {
-                    onSelectPresetCity(city);
-                  } else {
-                    onSelectSampleCity(city.id);
-                  }
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 flex items-center gap-2 cursor-pointer border focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none ${
-                  isSelected
-                    ? "bg-emerald-600 text-white font-bold border-emerald-600 shadow-xs ring-2 ring-emerald-500/20 scale-102"
-                    : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 hover:border-slate-300"
-                }`}
-              >
-                <span>{city.name}</span>
-                {isSelected && (
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
-                      isSelected
-                        ? "bg-white/20 text-white"
-                        : getAqiBadge(selectedCity.category)
-                    }`}
-                  >
-                    AQI {selectedCity.aqi}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+          <button
+            onClick={onRefresh}
+            disabled={isLoading}
+            aria-label="Refresh data"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 border border-slate-200 transition cursor-pointer disabled:opacity-50 shadow-2xs"
+            title="Refresh air quality data"
+          >
+            <RefreshCwIcon className={`w-3.5 h-3.5 text-emerald-600 ${isLoading ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">{isLoading ? "Refreshing..." : "Refresh"}</span>
+          </button>
         </div>
       </div>
+
+      {/* Preset Cities Pill Bar */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-xs text-slate-400 font-medium mr-1">Popular:</span>
+        {PRESET_CITIES.filter((city) => isLiveApiMode || SAMPLE_CITIES.some((sample) => sample.id === city.id)).map((city) => {
+          const isSelected = selectedCity.name.toLowerCase().includes(city.name.toLowerCase());
+          return (
+            <button
+              key={city.id}
+              onClick={() => {
+                if (isLiveApiMode) {
+                  onSelectPresetCity(city);
+                } else {
+                  onSelectSampleCity(city.id);
+                }
+              }}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition cursor-pointer border ${
+                isSelected
+                  ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
+                  : "bg-white hover:bg-slate-100/80 text-slate-700 border-slate-200"
+              }`}
+            >
+              {city.name}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* API Error Notification */}
+      {apiError && (
+        <div role="alert" className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <AlertTriangleIcon className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>{apiError}</span>
+          </div>
+          <button
+            onClick={onClearError}
+            className="text-xs font-medium text-rose-700 hover:text-rose-900 underline cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
     </section>
   );
 }

@@ -64,8 +64,6 @@ export async function searchCities(query: string, timeoutMs: number = 6000): Pro
     )}&count=6&language=en&format=json`;
 
     const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
-
     if (!res.ok) {
       throw new Error(`Geocoding server responded with HTTP ${res.status}`);
     }
@@ -75,21 +73,30 @@ export async function searchCities(query: string, timeoutMs: number = 6000): Pro
       return [];
     }
 
-    return json.results.map((r: Record<string, unknown>, idx: number) => ({
-      id: `${String(r.id || idx)}-${String(r.name).toLowerCase()}`,
-      name: String(r.name || "Unknown"),
-      country: String(r.country || ""),
-      admin1: r.admin1 ? String(r.admin1) : undefined,
-      latitude: Number(r.latitude),
-      longitude: Number(r.longitude),
-      timezone: r.timezone ? String(r.timezone) : undefined,
-    }));
+    return json.results.flatMap((r: Record<string, unknown>, idx: number) => {
+      const name = typeof r.name === "string" ? r.name.trim() : "";
+      const latitude = Number(r.latitude);
+      const longitude = Number(r.longitude);
+      if (!name || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+        return [];
+      }
+      return [{
+        id: `${String(r.id || idx)}-${name.toLowerCase()}`,
+        name,
+        country: typeof r.country === "string" ? r.country : "",
+        admin1: typeof r.admin1 === "string" ? r.admin1 : undefined,
+        latitude,
+        longitude,
+        timezone: typeof r.timezone === "string" ? r.timezone : undefined,
+      }];
+    });
   } catch (err: unknown) {
-    clearTimeout(timer);
     if (err instanceof Error && err.name === "AbortError") {
       throw new Error("City search timed out. Please check your internet connection.");
     }
     throw err;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -112,8 +119,6 @@ export async function fetchAirQualityFromOpenMeteo(
     )}&current=us_aqi,european_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&hourly=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,us_aqi,european_aqi&timezone=auto&forecast_days=2`;
 
     const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
-
     if (!res.ok) {
       throw new Error(`Open-Meteo API returned HTTP ${res.status}: ${res.statusText}`);
     }
@@ -126,6 +131,8 @@ export async function fetchAirQualityFromOpenMeteo(
       throw new Error("Connection to Open-Meteo timed out. Please check your network or try again.");
     }
     throw err;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -134,17 +141,25 @@ export async function fetchAirQualityFromOpenMeteo(
  * US EPA Breakpoints:
  * 0 - 50: Good
  * 51 - 100: Moderate
- * 101 - 150: Unhealthy for Sensitive Groups (Mapped to Poor)
- * 151 - 200: Unhealthy (Mapped to Poor)
- * 201 - 300: Very Unhealthy (Mapped to Very Poor)
- * 301+: Hazardous (Mapped to Severe)
+ * 101 - 150: Unhealthy for Sensitive Groups
+ * 151 - 200: Unhealthy
+ * 201 - 300: Very Unhealthy
+ * 301 - 500: Hazardous; above 500: Beyond AQI
  */
 export function categorizeUsAqi(aqi: number): AQICategory {
   if (aqi <= 50) return "Good";
   if (aqi <= 100) return "Moderate";
-  if (aqi <= 200) return "Poor";
-  if (aqi <= 300) return "Very Poor";
-  return "Severe";
+  if (aqi <= 150) return "Unhealthy for Sensitive Groups";
+  if (aqi <= 200) return "Unhealthy";
+  if (aqi <= 300) return "Very Unhealthy";
+  if (aqi <= 500) return "Hazardous";
+  return "Beyond AQI";
+}
+
+function finiteRounded(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.round(value * 10) / 10
+    : null;
 }
 
 /**
@@ -155,17 +170,26 @@ export function transformOpenMeteoData(
   city: GeocodedCity
 ): CityData {
   const current = raw.current;
-  const aqiVal = Math.round(current?.us_aqi ?? current?.european_aqi ?? 50);
+  if (typeof current?.us_aqi !== "number" || !Number.isFinite(current.us_aqi) || current.us_aqi < 0 || current.us_aqi > 1000) {
+    throw new Error("The forecast did not include a valid US AQI reading.");
+  }
+  const aqiVal = Math.round(current.us_aqi);
   const category = categorizeUsAqi(aqiVal);
 
-  const pm25Val = Math.round((current?.pm2_5 ?? 15) * 10) / 10;
-  const pm10Val = Math.round((current?.pm10 ?? 30) * 10) / 10;
-  const no2Val = Math.round((current?.nitrogen_dioxide ?? 20) * 10) / 10;
-  const so2Val = Math.round((current?.sulphur_dioxide ?? 10) * 10) / 10;
-  // Open-Meteo CO is often in µg/m³; standard ppm / mg/m³ is value / 1000
-  const coRaw = current?.carbon_monoxide ?? 500;
-  const coVal = Math.round((coRaw > 100 ? coRaw / 1000 : coRaw) * 10) / 10;
-  const o3Val = Math.round((current?.ozone ?? 40) * 10) / 10;
+  const pm25Val = finiteRounded(current?.pm2_5);
+  const pm10Val = finiteRounded(current?.pm10);
+  const no2Val = finiteRounded(current?.nitrogen_dioxide);
+  const so2Val = finiteRounded(current?.sulphur_dioxide);
+  const coRaw = finiteRounded(current?.carbon_monoxide);
+  const coUnit = raw.current_units?.carbon_monoxide?.toLowerCase().replace("μ", "µ");
+  const coVal = coRaw === null
+    ? null
+    : coUnit?.includes("µg") || coUnit?.includes("ug")
+      ? Math.round((coRaw / 1000) * 10) / 10
+      : coUnit?.includes("mg")
+        ? coRaw
+        : null;
+  const o3Val = finiteRounded(current?.ozone);
 
   // Criteria Pollutants mapping
   const pollutants: PollutantInfo[] = [
@@ -175,10 +199,7 @@ export function transformOpenMeteoData(
       fullName: "Fine Inhalable Particles (<2.5 µm)",
       value: pm25Val,
       unit: "µg/m³",
-      safeBenchmark: 15,
-      benchmarkLabel: "WHO 24h: 15 µg/m³",
-      category: pm25Val <= 15 ? "Good" : pm25Val <= 35 ? "Moderate" : pm25Val <= 75 ? "High" : "Critical",
-      healthImpact: "Deep lung penetration, systemic bloodstream inflammation",
+      guidelineLabel: "WHO 24h: 15 µg/m³",
       source: "Model forecast: vehicular exhaust, biomass smoke, regional dispersion",
     },
     {
@@ -187,10 +208,7 @@ export function transformOpenMeteoData(
       fullName: "Coarse Dust Particles (<10 µm)",
       value: pm10Val,
       unit: "µg/m³",
-      safeBenchmark: 45,
-      benchmarkLabel: "WHO 24h: 45 µg/m³",
-      category: pm10Val <= 45 ? "Good" : pm10Val <= 100 ? "Moderate" : pm10Val <= 200 ? "High" : "Critical",
-      healthImpact: "Upper respiratory irritation, sinus congestion and throat dryness",
+      guidelineLabel: "WHO 24h: 45 µg/m³",
       source: "Model forecast: surface dust, construction silt, windborne particulates",
     },
     {
@@ -199,10 +217,7 @@ export function transformOpenMeteoData(
       fullName: "Nitrogen Dioxide",
       value: no2Val,
       unit: "µg/m³",
-      safeBenchmark: 25,
-      benchmarkLabel: "WHO 24h: 25 µg/m³",
-      category: no2Val <= 25 ? "Good" : no2Val <= 50 ? "Moderate" : no2Val <= 100 ? "High" : "Critical",
-      healthImpact: "Airway hyper-reactivity and increased bronchial inflammation",
+      guidelineLabel: "WHO 24h: 25 µg/m³",
       source: "Model forecast: traffic fleet combustion and thermal power generation",
     },
     {
@@ -211,10 +226,7 @@ export function transformOpenMeteoData(
       fullName: "Sulfur Dioxide",
       value: so2Val,
       unit: "µg/m³",
-      safeBenchmark: 40,
-      benchmarkLabel: "WHO 24h: 40 µg/m³",
-      category: so2Val <= 40 ? "Good" : so2Val <= 80 ? "Moderate" : "High",
-      healthImpact: "Eye stinging and mucous membrane irritation",
+      guidelineLabel: "WHO 24h: 40 µg/m³",
       source: "Model forecast: industrial fuel burning and refinery plumes",
     },
     {
@@ -223,10 +235,7 @@ export function transformOpenMeteoData(
       fullName: "Carbon Monoxide",
       value: coVal,
       unit: "mg/m³",
-      safeBenchmark: 4.0,
-      benchmarkLabel: "WHO 24h: 4.0 mg/m³",
-      category: coVal <= 4.0 ? "Good" : coVal <= 9.0 ? "Moderate" : "High",
-      healthImpact: "Interferes with blood oxygen carrying capacity",
+      guidelineLabel: "WHO 24h: 4.0 mg/m³",
       source: "Model forecast: incomplete vehicle combustion in traffic corridors",
     },
     {
@@ -235,16 +244,10 @@ export function transformOpenMeteoData(
       fullName: "Ground-Level Ozone",
       value: o3Val,
       unit: "µg/m³",
-      safeBenchmark: 100,
-      benchmarkLabel: "WHO 8h: 100 µg/m³",
-      category: o3Val <= 100 ? "Good" : o3Val <= 140 ? "Moderate" : "High",
-      healthImpact: "Oxidative stress on alveolar tissue during sunny daylight",
+      guidelineLabel: "WHO 8h: 100 µg/m³",
       source: "Model forecast: photochemical reaction between NOx and VOCs",
     },
   ];
-
-  // Identify dominant pollutant by highest ratio over safe benchmark
-  const dominant = [...pollutants].sort((a, b) => b.value / b.safeBenchmark - a.value / a.safeBenchmark)[0];
 
   // Process hourly forecast
   const hourly: HourlyForecastItem[] = [];
@@ -254,13 +257,19 @@ export function transformOpenMeteoData(
     const pm25s = raw.hourly.pm2_5 || [];
     const pm10s = raw.hourly.pm10 || [];
 
-    // Find current hour index or start from 0
-    const nowIso = new Date().toISOString().substring(0, 13); // "YYYY-MM-DDTHH"
-    let startIndex = times.findIndex((t) => t.startsWith(nowIso));
-    if (startIndex < 0) startIndex = 0;
+    // The API's hourly strings use its requested local timezone. Align against
+    // its own current.time value rather than comparing them to browser UTC.
+    const currentHour = current?.time?.slice(0, 13);
+    let startIndex = currentHour ? times.findIndex((time) => time >= currentHour) : -1;
+    if (startIndex < 0) startIndex = times.length;
 
-    // Pick 10-12 hourly steps across next 24h (every 2 hours)
-    for (let i = startIndex; i < Math.min(times.length, startIndex + 24); i += 2) {
+    // Keep one point per forecast hour for a true next-24-hour view.
+    for (let i = startIndex; i < Math.min(times.length, startIndex + 24); i += 1) {
+      const aqiValue = usAqis[i];
+      const pm25Value = pm25s[i];
+      if (typeof aqiValue !== "number" || !Number.isFinite(aqiValue) || typeof pm25Value !== "number" || !Number.isFinite(pm25Value)) {
+        continue;
+      }
       const timeStr = times[i];
       const hourPart = timeStr.split("T")[1] || "12:00";
       const hourNum = parseInt(hourPart.split(":")[0], 10);
@@ -273,32 +282,30 @@ export function transformOpenMeteoData(
           ? "12 PM"
           : `${hourNum - 12} PM`;
 
-      const hAqi = Math.round(usAqis[i] ?? 50);
-      const hPm25 = Math.round((pm25s[i] ?? 15) * 10) / 10;
-      const hPm10 = Math.round((pm10s[i] ?? 30) * 10) / 10;
+      const hAqi = Math.round(aqiValue);
+      const hPm25 = Math.round(pm25Value * 10) / 10;
+      const hPm10 = finiteRounded(pm10s[i]);
       const hCategory = categorizeUsAqi(hAqi);
 
       // Hourly advice
       let advice = "Atmospheric conditions remain standard.";
       if (hAqi > 200) {
-        advice = "High model particulate spike. Avoid outdoor cardio; seal windows.";
+        advice = "The forecast is elevated. Consider reducing strenuous outdoor activity and check local guidance.";
       } else if (hAqi > 100) {
-        advice = "Moderate particulate accumulation. Sensitive groups should wear masks.";
+        advice = "The forecast is elevated; sensitive groups may wish to limit prolonged outdoor exertion.";
       } else {
-        advice = "Model predicts favorable dispersion; safe for outdoor ventilation.";
+        advice = "The forecast is relatively lower than higher-AQI hours in this forecast; it does not establish personal safety.";
       }
 
-      const isPeakHour = hAqi >= 180 || (hourNum >= 7 && hourNum <= 9) || (hourNum >= 19 && hourNum <= 21);
-
       hourly.push({
+        timestamp: timeStr,
         hour: hourPart,
         displayTime,
         aqi: hAqi,
         category: hCategory,
         pm25: hPm25,
-        pm10: hPm10,
+        ...(hPm10 !== null ? { pm10: hPm10 } : {}),
         advice,
-        isPeakHour,
       });
     }
   }
@@ -307,26 +314,26 @@ export function transformOpenMeteoData(
   const healthWarning =
     aqiVal > 200
       ? {
-          title: "Model Alert: Severe Particulate Burden",
+          title: "Elevated Model AQI",
           summary:
-            "Atmospheric dispersion models project high particulate concentrations. Airway mucosal irritation and reduced lung capacity are predicted across the urban grid.",
+            "The modeled AQI is elevated for this forecast period. Forecasts describe modeled outdoor conditions and cannot predict an individual's symptoms.",
           vulnerableGroups:
-            "Children, elderly individuals, and those with respiratory conditions should remain indoors with active HEPA air purification.",
+            "People in sensitive groups can consult local public-health guidance and follow advice from their clinician.",
         }
       : aqiVal > 100
       ? {
-          title: "Model Alert: Moderate Pollution Conditions",
+          title: "Elevated Model AQI",
           summary:
-            "Atmospheric models indicate elevated particulates. Individuals with pre-existing cardiopulmonary illness may experience mild symptoms during prolonged outdoor exertion.",
+            "The modeled AQI is above the lower forecast bands. It is a grid estimate and may not match conditions at a specific street or building.",
           vulnerableGroups:
-            "Sensitive individuals and outdoor commuters should use fitted masks and avoid heavy arterial traffic corridors.",
+            "People in sensitive groups may wish to limit prolonged or strenuous outdoor activity and follow local guidance.",
         }
       : {
-          title: "Model Alert: Favorable Atmospheric Quality",
+          title: "Relatively Lower Model AQI",
           summary:
-            "Numerical simulation indicates low boundary-layer particulate entrapment with healthy urban air dispersion.",
+            "The modeled AQI is in a lower band for this forecast. A lower model estimate does not mean that outdoor air is risk-free.",
           vulnerableGroups:
-            "Conditions are favorable for outdoor recreation, athletics, and home natural cross-ventilation.",
+            "Check local observations and public-health guidance, especially if someone in your household is sensitive to air pollution.",
         };
 
   const fetchTimestamp = new Date().toLocaleTimeString([], {
@@ -346,7 +353,6 @@ export function transformOpenMeteoData(
     },
     aqi: aqiVal,
     category,
-    dominantPollutant: `${dominant.name} (${dominant.fullName})`,
     lastUpdated: `Model Forecast (${fetchTimestamp})`,
     metadata: {
       sourceName: "Open-Meteo Air Quality API (Forecast/Model)",
@@ -354,15 +360,7 @@ export function transformOpenMeteoData(
       aqiStandard: "US EPA AQI (Model Estimate)",
       fetchedAt: fetchTimestamp,
       modelInfo:
-        "Values are generated from atmospheric chemistry dispersion models (CAMS / NOAA GFS) at grid resolution. Note: This US AQI is a numerical model forecast and differs from India's official CPCB CAAQMS sensor-based National AQI (NAQI).",
-    },
-    weather: {
-      temperature: 24,
-      condition: "Open-Meteo Model Grid",
-      humidity: 60,
-      windSpeed: 8.5,
-      windDirection: "WNW",
-      pressure: 1013,
+        "Values are Open-Meteo air-quality forecasts based on CAMS European or CAMS Global model data, depending on location. This US AQI is a numerical model forecast and differs from India's official CPCB National AQI (NAQI).",
     },
     healthWarning,
     pollutants,

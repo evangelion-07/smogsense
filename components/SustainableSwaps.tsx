@@ -6,11 +6,7 @@ import { SparklesIcon } from "./Icons";
 
 export function SustainableSwaps() {
   const [commuteDistanceKm, setCommuteDistanceKm] = useState<number>(15);
-  const [activeSwapIds, setActiveSwapIds] = useState<Record<string, boolean>>({
-    "swap-1": true,
-    "swap-2": true,
-    "swap-3": true,
-  });
+  const [activeSwapIds, setActiveSwapIds] = useState<Record<string, boolean>>({});
 
   const toggleSwap = (id: string) => {
     setActiveSwapIds((prev) => ({
@@ -19,28 +15,11 @@ export function SustainableSwaps() {
     }));
   };
 
-  // Calculate simulated monthly savings
-  // Standard petrol car emits ~180g CO2/km and ~0.08g PM2.5/km in urban stop-and-go
+  // Show scenario activity only; emissions and personal exposure need local,
+  // vehicle-specific inputs that this demo does not collect.
   const isTransitActive = !!activeSwapIds["swap-1"];
-  const isIncenseSwapActive = !!activeSwapIds["swap-3"];
-  const isSolarActive = !!activeSwapIds["swap-4"];
-
-  const monthlyDays = 22; // working days
-  const roundTripKm = commuteDistanceKm * 2;
-
-  // Monthly CO2 saved (kg)
-  const commuteCo2SavedKg = isTransitActive
-    ? Math.round((roundTripKm * 0.18 * monthlyDays * 0.75) * 10) / 10
-    : 0;
-  const solarCo2SavedKg = isSolarActive ? 100 : 0;
-  const totalCo2SavedKg = Math.round((commuteCo2SavedKg + solarCo2SavedKg) * 10) / 10;
-
-  // Monthly PM2.5 prevented from local air (grams)
-  const commutePm25SavedGrams = isTransitActive
-    ? Math.round((roundTripKm * 0.12 * monthlyDays) * 10) / 10
-    : 0;
-  const indoorSmokeSavedGrams = isIncenseSwapActive ? 35 : 0;
-  const totalPmSavedGrams = Math.round((commutePm25SavedGrams + indoorSmokeSavedGrams) * 10) / 10;
+  const selectedSwapCount = Object.values(activeSwapIds).filter(Boolean).length;
+  const monthlyCommuteDistanceKm = isTransitActive ? commuteDistanceKm * 2 * 22 : 0;
 
   const getDifficultyBadge = (difficulty: string) => {
     switch (difficulty) {
@@ -59,13 +38,13 @@ export function SustainableSwaps() {
       <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <span>Clean Air Habits &amp; Environmental Impact</span>
+              <span>Lower-Emission Travel &amp; Home Habits</span>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium">
               Eco Swaps
             </span>
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Simple everyday choices that lower city emissions and reduce your exposure to traffic exhaust.
+              Compare practical alternatives. Estimated emissions and personal exposure depend on local conditions and the choices being compared.
           </p>
         </div>
       </div>
@@ -77,11 +56,11 @@ export function SustainableSwaps() {
             <div className="flex items-center gap-2">
               <SparklesIcon className="w-5 h-5 text-emerald-600" />
               <h3 className="text-base font-bold text-slate-900">
-                Your Simulated Monthly Clean Air Impact
+              Monthly Commute Scenario
               </h3>
             </div>
             <p className="text-xs text-slate-600 max-w-xl">
-              Adjust your daily one-way commute distance to estimate emissions averted by switching to clean rapid transit and home habits:
+              Set a one-way commute distance. The travel distance below assumes 22 round trips per month when transit is selected; it does not estimate emissions or health effects.
             </p>
 
             <div className="flex items-center gap-4 pt-2">
@@ -90,6 +69,8 @@ export function SustainableSwaps() {
                 {[5, 15, 25, 40].map((dist) => (
                   <button
                     key={dist}
+                    type="button"
+                    aria-pressed={commuteDistanceKm === dist}
                     onClick={() => setCommuteDistanceKm(dist)}
                     className={`px-2.5 py-1 rounded-lg text-xs font-mono transition cursor-pointer border ${
                       commuteDistanceKm === dist
@@ -105,22 +86,22 @@ export function SustainableSwaps() {
           </div>
 
           {/* Impact Stats */}
-          <div className="flex items-center gap-4 shrink-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
             <div className="p-4 rounded-2xl bg-white border border-emerald-200 text-center min-w-[130px] shadow-2xs">
               <div className="text-[10px] text-slate-500 uppercase font-mono tracking-wider">
-                CO₂ Averted
+                Transit Commute Distance
               </div>
               <div className="text-2xl sm:text-3xl font-black text-emerald-700 mt-0.5">
-                {totalCo2SavedKg} <span className="text-xs font-normal text-slate-600">kg/mo</span>
+                {monthlyCommuteDistanceKm} <span className="text-xs font-normal text-slate-600">km/mo</span>
               </div>
             </div>
 
             <div className="p-4 rounded-2xl bg-white border border-sky-200 text-center min-w-[130px] shadow-2xs">
               <div className="text-[10px] text-slate-500 uppercase font-mono tracking-wider">
-                PM2.5 Prevented
+                Selected Swaps
               </div>
               <div className="text-2xl sm:text-3xl font-black text-sky-700 mt-0.5">
-                {totalPmSavedGrams} <span className="text-xs font-normal text-slate-600">g/mo</span>
+                {selectedSwapCount} <span className="text-xs font-normal text-slate-600">of {SUSTAINABLE_SWAPS_DATA.length}</span>
               </div>
             </div>
           </div>
@@ -147,7 +128,9 @@ export function SustainableSwaps() {
                     {swap.difficulty}
                   </span>
                   <button
+                    type="button"
                     onClick={() => toggleSwap(swap.id)}
+                    aria-pressed={isAdopted}
                     className={`text-xs px-2.5 py-1 rounded-lg font-medium transition cursor-pointer border ${
                       isAdopted
                         ? "bg-emerald-50 text-emerald-800 border-emerald-300"
@@ -180,10 +163,10 @@ export function SustainableSwaps() {
                 </p>
               </div>
 
-              {/* Emissions Benefit Footnote */}
+              {/* Scenario note */}
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                 <span className="text-slate-500 text-[11px]">
-                  Benefit: <strong className="text-emerald-700">{swap.emissionsSaved}</strong>
+                  Possible impact: <strong className="text-emerald-700">{swap.impactNote}</strong>
                 </span>
                 <span className="text-[10px] text-slate-400 font-mono">
                   {swap.airQualityBenefit}

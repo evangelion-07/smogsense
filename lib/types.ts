@@ -2,6 +2,11 @@ export type AQICategory =
   | "Good"
   | "Satisfactory"
   | "Moderate"
+  | "Unhealthy for Sensitive Groups"
+  | "Unhealthy"
+  | "Very Unhealthy"
+  | "Hazardous"
+  | "Beyond AQI"
   | "Poor"
   | "Very Poor"
   | "Severe";
@@ -9,7 +14,7 @@ export type AQICategory =
 export interface AirQualityMetadata {
   sourceName: "Open-Meteo Air Quality API (Forecast/Model)" | "Curated Sample Dataset (Demo)";
   isModelEstimate: boolean;
-  aqiStandard: "US EPA AQI (Model Estimate)" | "CPCB / WHO Standard Scale";
+  aqiStandard: "US EPA AQI (Model Estimate)" | "CPCB-style Categories (Demo)";
   fetchedAt: string; // ISO or human readable timestamp
   modelInfo?: string;
 }
@@ -18,16 +23,14 @@ export interface PollutantInfo {
   id: "pm25" | "pm10" | "no2" | "so2" | "co" | "o3";
   name: string;
   fullName: string;
-  value: number;
+  value: number | null;
   unit: string;
-  safeBenchmark: number; // WHO or standard safe limit
-  benchmarkLabel: string;
-  category: "Good" | "Moderate" | "High" | "Critical";
-  healthImpact: string;
+  guidelineLabel: string;
   source: string;
 }
 
 export interface HourlyForecastItem {
+  timestamp?: string;
   hour: string; // e.g. "06:00", "09:00"
   displayTime: string; // e.g. "6 AM", "9 AM"
   aqi: number;
@@ -36,7 +39,6 @@ export interface HourlyForecastItem {
   pm10?: number;
   temperature?: number;
   advice: string;
-  isPeakHour?: boolean;
 }
 
 export interface CityData {
@@ -50,10 +52,9 @@ export interface CityData {
   };
   aqi: number;
   category: AQICategory;
-  dominantPollutant: string;
   lastUpdated: string;
   metadata?: AirQualityMetadata;
-  weather: {
+  weather?: {
     temperature: number; // in °C
     condition: string;
     humidity: number; // in %
@@ -96,10 +97,10 @@ export type CommuteMode =
   | "car_cab";      // Private Car / Cab (AC)
 
 export type BudgetTier =
-  | "zero"          // Zero / Free (₹0)
-  | "low"           // Low Cost (Under ₹500 / $10)
-  | "moderate"      // Moderate (₹500 - ₹2,500 / $10-$30)
-  | "flexible";     // Flexible / High (₹2,500+ / $30+)
+  | "zero"          // No added spend
+  | "low"           // Small purchases
+  | "moderate"      // Room for selected upgrades
+  | "flexible";     // No fixed budget limit
 
 export interface SensitivityPreferences {
   hasChildren: boolean;
@@ -192,7 +193,7 @@ export interface SustainableSwap {
   description: string;
   currentHabit: string;
   ecoAlternative: string;
-  emissionsSaved: string; // e.g. "2.4 kg CO2 / trip"
+  impactNote: string;
   airQualityBenefit: string;
   difficulty: "Easy" | "Medium" | "High Impact";
   category: "transport" | "home" | "energy" | "community";

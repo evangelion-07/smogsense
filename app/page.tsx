@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { SAMPLE_CITIES } from "../lib/sampleData";
 import {
   CityData,
@@ -32,11 +32,14 @@ import { ActivityIcon, SparklesIcon, CheckCircleIcon, LeafIcon, InfoIcon } from 
 export default function Home() {
   const [selectedCity, setSelectedCity] = useState<CityData>(SAMPLE_CITIES[0]);
   const [activeGeocodedCity, setActiveGeocodedCity] = useState<GeocodedCity>(PRESET_CITIES[0]);
+  const activeGeocodedCityRef = useRef(activeGeocodedCity);
   const [isLiveApiMode, setIsLiveApiMode] = useState<boolean>(true);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [liveModeRefreshKey, setLiveModeRefreshKey] = useState(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
+  const cityRequestId = useRef(0);
 
   // Detailed Household Preferences Form State
   const [preferences, setPreferences] = useState<DetailedHouseholdPreferences>({
@@ -44,12 +47,12 @@ export default function Home() {
     commuteMode: "two_wheeler",
     budget: "low",
     sensitivities: {
-      hasChildren: true,
+      hasChildren: false,
       hasElderly: false,
-      hasAsthmaOrCardiac: true,
+      hasAsthmaOrCardiac: false,
       hasAllergiesOrSinus: false,
       hasPregnancy: false,
-      hasPets: true,
+      hasPets: false,
     },
   });
 
@@ -57,6 +60,7 @@ export default function Home() {
   const [geminiExplanation, setGeminiExplanation] = useState<GeminiStructuredExplanation | null>(null);
   const [isGeminiLoading, setIsGeminiLoading] = useState<boolean>(false);
   const [geminiError, setGeminiError] = useState<string | null>(null);
+  const geminiRequestId = useRef(0);
 
   // Deterministic Recommendations generated purely from forecast + preferences
   const recommendations = useMemo(() => {
@@ -68,48 +72,60 @@ export default function Home() {
     hasChildren: preferences.sensitivities.hasChildren,
     hasElderly: preferences.sensitivities.hasElderly,
     hasRespiratoryCondition: preferences.sensitivities.hasAsthmaOrCardiac,
-    isOutdoorAthlete: preferences.activityTime === "early_morning" || preferences.activityTime === "evening",
+    isOutdoorAthlete: false,
     hasPets: preferences.sensitivities.hasPets,
-    isDailyCommuter:
-      preferences.commuteMode === "two_wheeler" ||
-      preferences.commuteMode === "walking" ||
-      preferences.commuteMode === "auto_transit",
+    isDailyCommuter: false,
   }), [preferences]);
 
   // Fetch live air quality from Open-Meteo for a given geocoded city
   const fetchForCity = useCallback(async (city: GeocodedCity) => {
-    setIsLoading(true);
-    setApiError(null);
+    const requestId = ++cityRequestId.current;
     try {
       const rawData = await fetchAirQualityFromOpenMeteo(city.latitude, city.longitude);
       const transformed = transformOpenMeteoData(rawData, city);
+      if (requestId !== cityRequestId.current) return;
       setSelectedCity(transformed);
       setActiveGeocodedCity(city);
-      setNotice(`Updated forecast for ${city.name} from Open-Meteo`);
-      setTimeout(() => setNotice(null), 3500);
+      activeGeocodedCityRef.current = city;
+      setNotice(`Updated forecast for ${city.name}`);
+      setTimeout(() => setNotice(null), 3000);
     } catch (err: unknown) {
+      if (requestId !== cityRequestId.current) return;
       const msg = err instanceof Error ? err.message : "Unable to reach air quality service";
-      setApiError(msg);
-      const sampleFallback = SAMPLE_CITIES.find(
-        (c) => c.name.toLowerCase() === city.name.toLowerCase()
-      );
-      if (sampleFallback) {
-        setSelectedCity(sampleFallback);
-      }
+      setApiError(`Could not load a forecast for ${city.name}: ${msg}`);
     } finally {
-      setIsLoading(false);
+      if (requestId === cityRequestId.current) setIsLoading(false);
     }
   }, []);
 
-  // On mount, load initial city (New Delhi) from Open-Meteo
+  // Load the active city on mount and when the user switches back to live mode.
   useEffect(() => {
-    if (isLiveApiMode) {
-      fetchForCity(PRESET_CITIES[0]);
-    }
-  }, [fetchForCity, isLiveApiMode]);
+    if (!isLiveApiMode) return;
+
+    const city = activeGeocodedCityRef.current;
+    const requestId = ++cityRequestId.current;
+    void (async () => {
+      try {
+        const rawData = await fetchAirQualityFromOpenMeteo(city.latitude, city.longitude);
+        const transformed = transformOpenMeteoData(rawData, city);
+        if (requestId !== cityRequestId.current) return;
+        setSelectedCity(transformed);
+        setActiveGeocodedCity(city);
+        setNotice(`Updated forecast for ${city.name}`);
+        setTimeout(() => setNotice(null), 3000);
+      } catch (err: unknown) {
+        if (requestId !== cityRequestId.current) return;
+        const msg = err instanceof Error ? err.message : "Unable to reach air quality service";
+        setApiError(`Could not load a forecast for ${city.name}: ${msg}`);
+      } finally {
+        if (requestId === cityRequestId.current) setIsLoading(false);
+      }
+    })();
+  }, [isLiveApiMode, liveModeRefreshKey]);
 
   // Call Server-Side Gemini Endpoint
   const handleGenerateGeminiExplanation = async () => {
+    const requestId = ++geminiRequestId.current;
     setIsGeminiLoading(true);
     setGeminiError(null);
 
@@ -122,7 +138,6 @@ export default function Home() {
         body: JSON.stringify({
           city: selectedCity,
           preferences,
-          deterministicRecommendations: recommendations,
         }),
       });
 
@@ -131,81 +146,132 @@ export default function Home() {
         throw new Error(errorData.error || `Service returned status ${res.status}`);
       }
 
-      const data = await res.json();
-      setGeminiExplanation(data.explanation);
+      const data: unknown = await res.json();
+      if (requestId !== geminiRequestId.current) return;
+      if (!data || typeof data !== "object" || !("explanation" in data) || !data.explanation) {
+        const error = "The advisory service did not return a usable explanation.";
+        throw new Error(error);
+      }
+      setGeminiExplanation(data.explanation as GeminiStructuredExplanation);
       setNotice("Personalized advisory updated for your household");
       setTimeout(() => setNotice(null), 3000);
     } catch (err: unknown) {
+      if (requestId !== geminiRequestId.current) return;
       const message = err instanceof Error ? err.message : "Failed to load personalized advisory.";
       setGeminiError(message);
     } finally {
-      setIsGeminiLoading(false);
+      if (requestId === geminiRequestId.current) setIsGeminiLoading(false);
     }
   };
 
   // Handle Preset City Selection
   const handleSelectPresetCity = (preset: GeocodedCity) => {
+    setIsLoading(true);
+    setApiError(null);
+    setActiveGeocodedCity(preset);
+    activeGeocodedCityRef.current = preset;
+    geminiRequestId.current += 1;
     setGeminiExplanation(null);
+    setGeminiError(null);
+    setIsGeminiLoading(false);
     fetchForCity(preset);
   };
 
   // Handle City Search Result Selection
   const handleSelectSearchResult = (result: GeocodedCity) => {
+    if (!isLiveApiMode) {
+      setNotice(`Switch to Live mode to load a forecast for ${result.name}`);
+      setTimeout(() => setNotice(null), 3000);
+      return;
+    }
+    setIsLoading(true);
+    setApiError(null);
+    setActiveGeocodedCity(result);
+    activeGeocodedCityRef.current = result;
+    geminiRequestId.current += 1;
     setGeminiExplanation(null);
+    setGeminiError(null);
+    setIsGeminiLoading(false);
     fetchForCity(result);
   };
 
   // Handle Sample City Selection (when in sample demo mode)
   const handleSelectSampleCity = (cityId: string) => {
+    cityRequestId.current += 1;
+    setIsLoading(false);
+    geminiRequestId.current += 1;
     setGeminiExplanation(null);
+    setGeminiError(null);
+    setIsGeminiLoading(false);
     const found = SAMPLE_CITIES.find((c) => c.id === cityId) || SAMPLE_CITIES[0];
     setSelectedCity(found);
-    setNotice(`Switched to curated dataset for ${found.name}`);
+    const matchingPreset = PRESET_CITIES.find((city) => city.id === found.id);
+    if (matchingPreset) {
+      setActiveGeocodedCity(matchingPreset);
+      activeGeocodedCityRef.current = matchingPreset;
+    }
+    setNotice(`Switched to dataset for ${found.name}`);
     setTimeout(() => setNotice(null), 3000);
   };
 
   // Toggle between Live Open-Meteo API and Curated Sample Data
   const handleToggleApiMode = (live: boolean) => {
     setIsLiveApiMode(live);
+    setIsLoading(live);
     setApiError(null);
     setGeminiExplanation(null);
-    if (live) {
-      fetchForCity(activeGeocodedCity);
-    } else {
+    setGeminiError(null);
+    geminiRequestId.current += 1;
+    setIsGeminiLoading(false);
+    if (!live) {
+      cityRequestId.current += 1;
+      setIsLoading(false);
       const sampleMatch =
         SAMPLE_CITIES.find((c) => c.name.toLowerCase() === activeGeocodedCity.name.toLowerCase()) ||
         SAMPLE_CITIES[0];
       setSelectedCity(sampleMatch);
       setNotice(`Switched to offline demo mode`);
       setTimeout(() => setNotice(null), 3000);
+    } else {
+      cityRequestId.current += 1;
+      setLiveModeRefreshKey((key) => key + 1);
     }
   };
 
   // Refresh handler
   const handleRefresh = () => {
+    geminiRequestId.current += 1;
     setGeminiExplanation(null);
+    setGeminiError(null);
+    setIsGeminiLoading(false);
     if (isLiveApiMode) {
+      setIsLoading(true);
+      setApiError(null);
       fetchForCity(activeGeocodedCity);
     } else {
       setIsLoading(true);
       setTimeout(() => {
         setIsLoading(false);
         setNotice(`Readings refreshed for ${selectedCity.name}`);
-        setTimeout(() => setNotice(null), 2500);
-      }, 500);
+        setTimeout(() => setNotice(null), 2000);
+      }, 400);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 selection:bg-emerald-600 selection:text-white">
+    <div className="min-h-screen flex flex-col bg-slate-50/60 text-slate-800 selection:bg-emerald-600 selection:text-white">
       {/* Top Navigation */}
-      <Navbar activeTab={activeTab} onSelectTab={setActiveTab} />
+      <Navbar
+        activeTab={activeTab}
+        isModelEstimate={selectedCity.metadata?.isModelEstimate ?? false}
+        onSelectTab={setActiveTab}
+      />
 
       {/* Main Content Dashboard */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-8 sm:space-y-10">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
         {/* Real-time Notice Toast */}
         {notice && (
-          <div role="status" aria-live="polite" className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm text-center font-semibold shadow-xs animate-fadeIn">
+          <div role="status" aria-live="polite" className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm text-center font-medium shadow-xs">
             {notice}
           </div>
         )}
@@ -224,66 +290,71 @@ export default function Home() {
           onClearError={() => setApiError(null)}
         />
 
-        {/* 2. Sleek Dashboard View Navigator (Clean, Minimalist SVG Icons) */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-2 sm:p-2.5 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <nav aria-label="Dashboard view navigation" className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        {/* 2. Sleek Dashboard View Navigator */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-1">
+          <nav aria-label="Dashboard views" className="flex flex-wrap items-center gap-1.5">
             <button
               onClick={() => setActiveTab("overview")}
-              className={`px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-semibold transition-all duration-150 flex items-center gap-2 cursor-pointer ${
+              aria-pressed={activeTab === "overview"}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
                 activeTab === "overview"
                   ? "bg-emerald-600 text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+                  : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300"
               }`}
             >
-              <ActivityIcon className={`w-4 h-4 ${activeTab === "overview" ? "text-white" : "text-emerald-600"}`} />
-              <span>Overview &amp; Forecast</span>
+              <ActivityIcon className="w-3.5 h-3.5" />
+              <span>Overview</span>
             </button>
 
             <button
               onClick={() => setActiveTab("advisor")}
-              className={`px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-semibold transition-all duration-150 flex items-center gap-2 cursor-pointer ${
+              aria-pressed={activeTab === "advisor"}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
                 activeTab === "advisor"
                   ? "bg-emerald-600 text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+                  : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300"
               }`}
             >
-              <SparklesIcon className={`w-4 h-4 ${activeTab === "advisor" ? "text-white" : "text-purple-600"}`} />
-              <span>Personalized Advisory</span>
+              <SparklesIcon className="w-3.5 h-3.5" />
+              <span>Health Advisory</span>
             </button>
 
             <button
               onClick={() => setActiveTab("actions")}
-              className={`px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-semibold transition-all duration-150 flex items-center gap-2 cursor-pointer ${
+              aria-pressed={activeTab === "actions"}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
                 activeTab === "actions"
                   ? "bg-emerald-600 text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+                  : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300"
               }`}
             >
-              <CheckCircleIcon className={`w-4 h-4 ${activeTab === "actions" ? "text-white" : "text-emerald-600"}`} />
-              <span>Daily Action Plan</span>
+              <CheckCircleIcon className="w-3.5 h-3.5" />
+              <span>Daily Plan</span>
             </button>
 
             <button
               onClick={() => setActiveTab("lifestyle")}
-              className={`px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-semibold transition-all duration-150 flex items-center gap-2 cursor-pointer ${
+              aria-pressed={activeTab === "lifestyle"}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
                 activeTab === "lifestyle"
                   ? "bg-emerald-600 text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+                  : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300"
               }`}
             >
-              <LeafIcon className={`w-4 h-4 ${activeTab === "lifestyle" ? "text-white" : "text-teal-600"}`} />
-              <span>Living &amp; Swaps</span>
+              <LeafIcon className="w-3.5 h-3.5" />
+              <span>Clean Habits</span>
             </button>
 
             <button
               onClick={() => setActiveTab("methodology")}
-              className={`px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-semibold transition-all duration-150 flex items-center gap-2 cursor-pointer ${
+              aria-pressed={activeTab === "methodology"}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
                 activeTab === "methodology"
                   ? "bg-emerald-600 text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+                  : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300"
               }`}
             >
-              <InfoIcon className={`w-4 h-4 ${activeTab === "methodology" ? "text-white" : "text-slate-500"}`} />
+              <InfoIcon className="w-3.5 h-3.5" />
               <span>Data Sources</span>
             </button>
           </nav>
@@ -291,45 +362,36 @@ export default function Home() {
           {/* Toggle Full Page Scroll vs Focused View */}
           <button
             onClick={() => setActiveTab(activeTab === "all" ? "overview" : "all")}
-            className={`px-3.5 py-2 rounded-2xl text-xs font-semibold transition cursor-pointer self-start lg:self-auto border ${
-              activeTab === "all"
-                ? "bg-slate-900 text-white border-slate-900 shadow-xs"
-                : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-            }`}
+            aria-pressed={activeTab === "all"}
+            className="text-xs font-medium text-slate-500 hover:text-slate-800 underline self-start sm:self-auto cursor-pointer"
           >
-            {activeTab === "all" ? "Exit Full View" : "Show All Views"}
+            {activeTab === "all" ? "Show focused tabs" : "View all sections on one page"}
           </button>
         </div>
 
-        {/* VIEW 1: Overview & Forecast (AQI Summary, 24h Timeline, Criteria Pollutants) */}
+        {/* VIEW 1: Overview & Forecast (AQI Summary, Criteria Pollutants, 24h Timeline) */}
         {(activeTab === "overview" || activeTab === "all") && (
-          <div className="space-y-8 sm:space-y-10 animate-fadeIn">
-            {activeTab === "all" && (
-              <div className="pt-4 border-t border-slate-200 flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-slate-500">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span>Live Air Quality &amp; Forecast</span>
-              </div>
-            )}
+          <div className="space-y-6 sm:space-y-8">
             <AirQualitySummary city={selectedCity} />
+            <PollutantCards
+              pollutants={selectedCity.pollutants}
+              isModelEstimate={selectedCity.metadata?.isModelEstimate ?? false}
+            />
             <HourlyForecastChart forecast={selectedCity.hourlyForecast} city={selectedCity} />
-            <PollutantCards pollutants={selectedCity.pollutants} />
           </div>
         )}
 
         {/* VIEW 2: Personalized Advisory (Household Profile + Recommendations) */}
         {(activeTab === "advisor" || activeTab === "all") && (
-          <div className="space-y-8 sm:space-y-10 animate-fadeIn">
-            {activeTab === "all" && (
-              <div className="pt-6 border-t border-slate-200 flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-slate-500">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span>Household Profile &amp; Recommendations</span>
-              </div>
-            )}
+          <div className="space-y-6 sm:space-y-8">
             <HouseholdPreferencesForm
               preferences={preferences}
               onChangePreferences={(p) => {
                 setPreferences(p);
-                if (geminiExplanation) setGeminiExplanation(null);
+                geminiRequestId.current += 1;
+                setGeminiExplanation(null);
+                setGeminiError(null);
+                setIsGeminiLoading(false);
               }}
             />
             <TailoredRecommendations
@@ -346,26 +408,18 @@ export default function Home() {
 
         {/* VIEW 3: Daily Action Plan */}
         {(activeTab === "actions" || activeTab === "all") && (
-          <div className="space-y-8 sm:space-y-10 animate-fadeIn">
-            {activeTab === "all" && (
-              <div className="pt-6 border-t border-slate-200 flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-slate-500">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span>Daily Action Checklist</span>
-              </div>
-            )}
-            <DailyActionPlan city={selectedCity} preferences={simpleProfile} />
+          <div className="space-y-6 sm:space-y-8">
+            <DailyActionPlan
+              key={`${selectedCity.id}-${selectedCity.aqi}-${JSON.stringify(simpleProfile)}`}
+              city={selectedCity}
+              preferences={simpleProfile}
+            />
           </div>
         )}
 
         {/* VIEW 4: Indoor Air Quality & Sustainable Swaps */}
         {(activeTab === "lifestyle" || activeTab === "all") && (
-          <div className="space-y-8 sm:space-y-10 animate-fadeIn">
-            {activeTab === "all" && (
-              <div className="pt-6 border-t border-slate-200 flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-slate-500">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span>Indoor Air &amp; Habit Swaps</span>
-              </div>
-            )}
+          <div className="space-y-6 sm:space-y-8">
             <IndoorAirTips />
             <SustainableSwaps />
           </div>
@@ -373,19 +427,13 @@ export default function Home() {
 
         {/* VIEW 5: Methodology, Standards & Citations */}
         {(activeTab === "methodology" || activeTab === "all") && (
-          <div className="space-y-8 sm:space-y-10 animate-fadeIn">
-            {activeTab === "all" && (
-              <div className="pt-6 border-t border-slate-200 flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-slate-500">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span>Data Sources &amp; Methodology</span>
-              </div>
-            )}
+          <div className="space-y-6 sm:space-y-8">
             <MethodologySection />
           </div>
         )}
       </main>
 
-      {/* Bottom Footer */}
+      {/* Footer */}
       <Footer />
     </div>
   );

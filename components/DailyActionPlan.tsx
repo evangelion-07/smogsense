@@ -12,10 +12,17 @@ interface DailyActionPlanProps {
 export function DailyActionPlan({ city, preferences }: DailyActionPlanProps) {
   // Generate tailored actions based on AQI and preferences
   const getActions = (): DailyAction[] => {
-    const isSevere = city.aqi > 300;
-    const isPoor = city.aqi > 200;
-    const isModerate = city.aqi > 100;
-    const isGood = city.aqi <= 100;
+    const isUsEpaScale = city.metadata?.aqiStandard.startsWith("US EPA") ?? true;
+    const isSevere = isUsEpaScale
+      ? city.category === "Hazardous" || city.category === "Beyond AQI"
+      : city.category === "Severe";
+    const isPoor = isUsEpaScale
+      ? ["Unhealthy for Sensitive Groups", "Unhealthy", "Very Unhealthy"].includes(city.category)
+      : ["Poor", "Very Poor"].includes(city.category);
+    const isModerate = isUsEpaScale
+      ? city.category === "Moderate"
+      : ["Satisfactory", "Moderate"].includes(city.category);
+    const isGood = city.category === "Good";
 
     const list: DailyAction[] = [];
 
@@ -24,18 +31,18 @@ export function DailyActionPlan({ city, preferences }: DailyActionPlanProps) {
       list.push({
         id: "act-m1",
         timeSlot: "Morning (6 AM - 10 AM)",
-        title: "Morning Smog Inversion: Windows Strictly Sealed",
+        title: "Review local readings before ventilating",
         description:
-          "Nocturnal cold air keeps heavy particulates trapped at ground level. Keep all balcony doors and windows tightly shut.",
+          "The modeled AQI is elevated. Check nearby readings before ventilating, and follow local public-health guidance.",
         type: "ventilation",
         urgency: "urgent",
       });
       list.push({
         id: "act-m2",
         timeSlot: "Morning (6 AM - 10 AM)",
-        title: "Mandatory N95 / FFP2 Respirator for Commute",
+        title: "Consider a well-fitting particulate respirator outdoors",
         description:
-          "Surgical and cloth masks fail to filter sub-micron PM2.5. Wear a snug-fitting N95 respirator during morning transit.",
+          "If you choose to wear a respirator, use a certified model that fits well. Follow local guidance and consider individual health needs.",
         type: "mask",
         urgency: "urgent",
       });
@@ -43,9 +50,9 @@ export function DailyActionPlan({ city, preferences }: DailyActionPlanProps) {
       list.push({
         id: "act-m1-mod",
         timeSlot: "Morning (6 AM - 10 AM)",
-        title: "Light Morning Walk in Vegetated Parks Only",
+        title: "Check local readings before a morning walk",
         description:
-          "Moderate particulate levels present. Avoid busy road sides; prefer dense green spaces with high tree density.",
+          "The forecast is elevated. Sensitive people may wish to reduce prolonged or strenuous outdoor activity and avoid busy roads where practical.",
         type: "exercise",
         urgency: "recommended",
       });
@@ -53,9 +60,9 @@ export function DailyActionPlan({ city, preferences }: DailyActionPlanProps) {
       list.push({
         id: "act-m1-good",
         timeSlot: "Morning (6 AM - 10 AM)",
-        title: "Optimal Window for Outdoor Jogging & Full Ventilation",
+        title: "Review local readings before outdoor activity or ventilation",
         description:
-          "Air quality is clean (AQI " + city.aqi + "). Open all doors and windows to purge indoor CO2 and enjoy outdoor cardio.",
+          "The modeled AQI is " + city.aqi + ". This is a forecast estimate, not a guarantee of conditions at your location; check nearby readings before planning activity.",
         type: "ventilation",
         urgency: "normal",
       });
@@ -65,9 +72,9 @@ export function DailyActionPlan({ city, preferences }: DailyActionPlanProps) {
       list.push({
         id: "act-m-child",
         timeSlot: "Morning (6 AM - 10 AM)",
-        title: "Pediatric School Transit Advisory",
+        title: "Check local school guidance",
         description:
-          "Ensure school transport has closed windows. Provide child-sized KF94/N95 masks and request indoor physical education sessions.",
+          "Check school and local public-health guidance. Ask the school about reducing strenuous outdoor activity when local conditions are elevated.",
         type: "health",
         urgency: "urgent",
         householdSpecificTag: "Children",
@@ -78,9 +85,9 @@ export function DailyActionPlan({ city, preferences }: DailyActionPlanProps) {
       list.push({
         id: "act-m-elderly",
         timeSlot: "Morning (6 AM - 10 AM)",
-        title: "Cancel Early Morning Park Walk",
+        title: "Adjust outdoor plans using local readings",
         description:
-          "Winter morning cold air combined with peak particulates causes acute bronchospasm and elevates stroke risk. Substitute with indoor hallway walking.",
+          "When local readings are elevated, consider a lower-exertion indoor alternative and follow the person's clinician guidance.",
         type: "health",
         urgency: "urgent",
         householdSpecificTag: "Seniors",
@@ -91,9 +98,9 @@ export function DailyActionPlan({ city, preferences }: DailyActionPlanProps) {
       list.push({
         id: "act-m-athlete",
         timeSlot: "Morning (6 AM - 10 AM)",
-        title: "Shift Cardio Indoors with HEPA Purifier",
+        title: "Consider moving strenuous exercise indoors",
         description:
-          "Running outdoors today will deposit high particulate mass deep into alveolar sacs. Use an indoor treadmill or stationary bike with air filtration.",
+          "Consider moving strenuous exercise indoors when local readings are elevated. Indoor filtration may help reduce particles when used and maintained as directed.",
         type: "exercise",
         urgency: isSevere ? "urgent" : "recommended",
         householdSpecificTag: "Athletes",
@@ -105,9 +112,9 @@ export function DailyActionPlan({ city, preferences }: DailyActionPlanProps) {
       list.push({
         id: "act-a1",
         timeSlot: "Afternoon (11 AM - 4 PM)",
-        title: "Brief Solar Ventilation Flushing (15 Mins)",
+        title: "Check conditions before ventilating",
         description:
-          "Between 1:30 PM and 3:00 PM, vertical solar convection temporarily lifts ground particulates. Crack opposite windows for 15 minutes, then reseal and boost purifiers.",
+          "Ventilate when nearby outdoor readings are lower than indoor conditions, if known. The forecast alone cannot determine the best window-opening time for a specific home.",
         type: "ventilation",
         urgency: "recommended",
       });
@@ -115,8 +122,8 @@ export function DailyActionPlan({ city, preferences }: DailyActionPlanProps) {
       list.push({
         id: "act-a1-good",
         timeSlot: "Afternoon (11 AM - 4 PM)",
-        title: "Solar Disinfection & Natural Air Turnover",
-        description: "Keep cross-ventilation open to maintain indoor air fresh and dry.",
+        title: "Check local conditions before ventilating",
+        description: "Use nearby outdoor readings and indoor conditions to decide when to ventilate.",
         type: "ventilation",
         urgency: "normal",
       });
@@ -126,9 +133,9 @@ export function DailyActionPlan({ city, preferences }: DailyActionPlanProps) {
       list.push({
         id: "act-a-resp",
         timeSlot: "Afternoon (11 AM - 4 PM)",
-        title: "Hydration & Peak Flow Monitoring",
+        title: "Follow the existing respiratory care plan",
         description:
-          "Maintain airway mucosal hydration with warm fluids and steam inhalation. Ensure rescue inhalers are readily accessible at work or home.",
+          "Follow the person's existing care plan and clinician guidance. Keep prescribed medication available as directed.",
         type: "health",
         urgency: "recommended",
         householdSpecificTag: "Respiratory Sensitive",
@@ -140,9 +147,9 @@ export function DailyActionPlan({ city, preferences }: DailyActionPlanProps) {
       list.push({
         id: "act-e1",
         timeSlot: "Night (9 PM - 6 AM)",
-        title: "Activate HEPA Air Purifier in Sleeping Quarters",
+        title: "Use an available air cleaner as directed",
         description:
-          "Run air purifier in sleep mode at least 45 minutes before bedtime to scrub ambient PM2.5 down below 15 µg/m³ for restorative sleep.",
+          "If available, run and maintain the air purifier according to its manufacturer instructions. Its effect depends on the room, device, and filter.",
         type: "purifier",
         urgency: "urgent",
       });
@@ -151,7 +158,7 @@ export function DailyActionPlan({ city, preferences }: DailyActionPlanProps) {
         timeSlot: "Evening (5 PM - 8 PM)",
         title: "Wet-Mop Hard Floors; Avoid Dry Sweeping",
         description:
-          "Dry brooms re-suspend toxic dust particles into breathing zones. Use a damp microfiber mop to capture settled heavy metals and fly ash.",
+          "Damp dusting or mopping can reduce the amount of settled dust stirred back into the air.",
         type: "health",
         urgency: "recommended",
       });
@@ -159,9 +166,9 @@ export function DailyActionPlan({ city, preferences }: DailyActionPlanProps) {
       list.push({
         id: "act-e1-good",
         timeSlot: "Evening (5 PM - 8 PM)",
-        title: "Evening Stroll & Leisurely Outdoor Gathering",
+        title: "Check local readings before outdoor activity",
         description:
-          "Clean urban air provides safe outdoor leisure. Ideal window for community park visits.",
+          "Check local readings before outdoor leisure; a lower modeled AQI does not guarantee risk-free air at a specific location.",
         type: "exercise",
         urgency: "normal",
       });
@@ -243,29 +250,23 @@ export function DailyActionPlan({ city, preferences }: DailyActionPlanProps) {
                 <h3 className="text-sm font-bold text-slate-900 tracking-wide">{slot}</h3>
               </div>
 
-              <div role="list" aria-label={`Actions for ${slot}`} className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              <ul aria-label={`Actions for ${slot}`} className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 {slotActions.map((act) => {
                   const isDone = !!completedIds[act.id];
 
                   return (
-                    <div
-                      key={act.id}
-                      role="checkbox"
-                      aria-checked={isDone}
-                      tabIndex={0}
-                      onClick={() => toggleComplete(act.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === " " || e.key === "Enter") {
-                          e.preventDefault();
-                          toggleComplete(act.id);
-                        }
-                      }}
-                      className={`p-4 rounded-xl border transition-all duration-200 cursor-pointer flex items-start gap-3 group focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none ${
-                        isDone
-                          ? "bg-emerald-50/50 border-emerald-200 opacity-75"
-                          : "bg-slate-50/70 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                      }`}
-                    >
+                    <li key={act.id}>
+                      <button
+                        type="button"
+                        role="checkbox"
+                        aria-checked={isDone}
+                        onClick={() => toggleComplete(act.id)}
+                        className={`w-full text-left p-4 rounded-xl border transition-all duration-200 cursor-pointer flex items-start gap-3 group focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none ${
+                          isDone
+                            ? "bg-emerald-50/50 border-emerald-200 opacity-75"
+                            : "bg-slate-50/70 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
                       {/* Checkbox Icon */}
                       <div
                         className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 transition-all ${
@@ -312,10 +313,11 @@ export function DailyActionPlan({ city, preferences }: DailyActionPlanProps) {
                           {act.description}
                         </p>
                       </div>
-                    </div>
+                      </button>
+                    </li>
                   );
                 })}
-              </div>
+              </ul>
             </div>
           );
         })}

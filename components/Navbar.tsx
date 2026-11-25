@@ -7,10 +7,11 @@ export type DashboardTab = "overview" | "advisor" | "actions" | "lifestyle" | "m
 
 interface NavbarProps {
   activeTab?: DashboardTab;
+  isModelEstimate?: boolean;
   onSelectTab?: (tab: DashboardTab) => void;
 }
 
-export function Navbar({ activeTab, onSelectTab }: NavbarProps) {
+export function Navbar({ activeTab, isModelEstimate = false, onSelectTab }: NavbarProps) {
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, tab: DashboardTab, targetId: string) => {
     e.preventDefault();
     if (onSelectTab) {
@@ -25,8 +26,8 @@ export function Navbar({ activeTab, onSelectTab }: NavbarProps) {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 backdrop-blur-md shadow-2xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <header className="sticky top-0 z-50 w-full border-b border-slate-200/80 bg-white/95 backdrop-blur-md shadow-2xs">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Brand */}
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-500/20">
@@ -36,7 +37,7 @@ export function Navbar({ activeTab, onSelectTab }: NavbarProps) {
             <div className="flex items-center gap-2">
               <span className="text-xl font-bold tracking-tight text-slate-900">SmogSense</span>
               <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                Live
+                {isModelEstimate ? "Model forecast" : "Demo data"}
               </span>
             </div>
             <p className="text-xs text-slate-500">Urban Air Quality &amp; Daily Action Guide</p>

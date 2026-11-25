@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { HourlyForecastItem, AQICategory, CityData } from "../lib/types";
 import { ClockIcon, AlertTriangleIcon, SparklesIcon } from "./Icons";
 
@@ -10,16 +10,7 @@ interface HourlyForecastChartProps {
 }
 
 export function HourlyForecastChart({ forecast, city }: HourlyForecastChartProps) {
-  const [selectedHour, setSelectedHour] = useState<HourlyForecastItem>(
-    forecast.find((f) => f.isPeakHour) || forecast[2] || forecast[0]
-  );
-
-  // Keep selectedHour synced if forecast changes
-  React.useEffect(() => {
-    if (forecast && forecast.length > 0) {
-      setSelectedHour(forecast.find((f) => f.isPeakHour) || forecast[0]);
-    }
-  }, [forecast]);
+  const [selectedHourKey, setSelectedHourKey] = useState<string | null>(null);
 
   const getBarColor = (category: AQICategory) => {
     switch (category) {
@@ -29,10 +20,15 @@ export function HourlyForecastChart({ forecast, city }: HourlyForecastChartProps
         return "bg-lime-500 hover:bg-lime-400";
       case "Moderate":
         return "bg-amber-500 hover:bg-amber-400";
+      case "Unhealthy for Sensitive Groups":
       case "Poor":
         return "bg-orange-500 hover:bg-orange-400";
+      case "Unhealthy":
       case "Very Poor":
         return "bg-rose-500 hover:bg-rose-400";
+      case "Very Unhealthy":
+      case "Hazardous":
+      case "Beyond AQI":
       case "Severe":
       default:
         return "bg-purple-600 hover:bg-purple-500";
@@ -47,10 +43,15 @@ export function HourlyForecastChart({ forecast, city }: HourlyForecastChartProps
         return "text-lime-700";
       case "Moderate":
         return "text-amber-700";
+      case "Unhealthy for Sensitive Groups":
       case "Poor":
         return "text-orange-700";
+      case "Unhealthy":
       case "Very Poor":
         return "text-rose-700";
+      case "Very Unhealthy":
+      case "Hazardous":
+      case "Beyond AQI":
       case "Severe":
       default:
         return "text-purple-700";
@@ -65,9 +66,9 @@ export function HourlyForecastChart({ forecast, city }: HourlyForecastChartProps
     );
   }
 
-  // Find lowest and highest AQI points
-  const lowestPoint = [...forecast].sort((a, b) => a.aqi - b.aqi)[0];
-  const highestPoint = [...forecast].sort((a, b) => b.aqi - a.aqi)[0];
+  const lowestPoint = forecast.reduce((lowest, item) => item.aqi < lowest.aqi ? item : lowest, forecast[0]);
+  const highestPoint = forecast.reduce((highest, item) => item.aqi > highest.aqi ? item : highest, forecast[0]);
+  const selectedHour = forecast.find((item) => (item.timestamp ?? item.hour) === selectedHourKey) || highestPoint;
 
   // Max AQI for relative bar height calculation
   const maxAqi = Math.max(...forecast.map((f) => f.aqi), 100);
@@ -75,19 +76,20 @@ export function HourlyForecastChart({ forecast, city }: HourlyForecastChartProps
   const sourceName = city?.metadata?.sourceName || "Curated Dataset";
   const fetchTime = city?.metadata?.fetchedAt || "Latest";
   const aqiStandard = city?.metadata?.aqiStandard || "AQI Standard";
+  const isModelForecast = city?.metadata?.isModelEstimate ?? false;
 
   return (
     <section id="forecast" aria-labelledby="forecast-heading" className="w-full">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-4">
         <div>
           <h2 id="forecast-heading" className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <span>24-Hour Pollution &amp; AQI Forecast</span>
+            <span>{isModelForecast ? "24-Hour Pollution &amp; AQI Outlook" : "Sample Pollution &amp; AQI Series"}</span>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-normal border border-slate-200">
               PM2.5 &bull; PM10 &bull; {aqiStandard.split("(")[0]}
             </span>
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Hourly projection from <strong>{sourceName}</strong> (Updated: {fetchTime}).
+            {isModelForecast ? "Hourly model forecast" : "Illustrative demonstration values"} from <strong>{sourceName}</strong> (Updated: {fetchTime}).
           </p>
         </div>
         <div className="text-[11px] text-slate-500 mt-2 sm:mt-0 flex items-center gap-1.5">
@@ -104,7 +106,7 @@ export function HourlyForecastChart({ forecast, city }: HourlyForecastChartProps
             <span className="text-emerald-700 font-semibold">{sourceName}</span>
           </div>
           <div className="text-[11px] font-mono text-slate-500">
-            Grid Forecast &bull; Timestamp: {fetchTime}
+            {isModelForecast ? "Grid forecast" : "Sample series"} &bull; {isModelForecast ? "Timestamp" : "Dataset"}: {fetchTime}
           </div>
         </div>
 
@@ -150,20 +152,21 @@ export function HourlyForecastChart({ forecast, city }: HourlyForecastChartProps
             <div className="min-w-[620px] flex items-end justify-between gap-3 h-52 px-2 pt-6">
               {forecast.map((item) => {
                 const heightPercent = Math.max(16, Math.round((item.aqi / maxAqi) * 100));
-                const isSelected = selectedHour.hour === item.hour;
+                const isSelected = (selectedHour.timestamp ?? selectedHour.hour) === (item.timestamp ?? item.hour);
+                const isForecastPeak = item.aqi === highestPoint.aqi;
                 const barColor = getBarColor(item.category);
 
                 return (
                   <button
-                    key={item.hour}
+                    key={item.timestamp ?? item.hour}
                     type="button"
                     aria-label={`Inspect forecast for ${item.displayTime}: AQI ${item.aqi}, PM2.5 ${item.pm25} micrograms per cubic meter`}
                     aria-pressed={isSelected}
-                    onClick={() => setSelectedHour(item)}
+                    onClick={() => setSelectedHourKey(item.timestamp ?? item.hour)}
                     className="flex-1 flex flex-col items-center h-full justify-end group focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none rounded-xl cursor-pointer"
                   >
                     {/* Peak badge tag */}
-                    {item.isPeakHour && (
+                    {isForecastPeak && (
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-300 mb-1">
                         Peak
                       </span>
@@ -226,7 +229,9 @@ export function HourlyForecastChart({ forecast, city }: HourlyForecastChartProps
                 )}
               </div>
               <p className="text-xs sm:text-sm text-slate-600 mt-1">
-                {selectedHour.advice}
+                {isModelForecast
+                  ? selectedHour.advice
+                  : "Illustrative demo point; check current local readings before making activity decisions."}
               </p>
             </div>
           </div>

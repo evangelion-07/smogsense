@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SmogSense | Urban Air Quality & Daily Action Guide",
-  description: "SmogSense is an urban air quality assistant providing real-time risk summaries, hourly forecasts, personalized household health advisories, and sustainable daily habits.",
+  title: "SmogSense | Air Quality Forecast & Household Advice",
+  description: "Air-quality model forecasts, pollutant trends, and practical household guidance.",
+  keywords: ["Air Quality", "SmogSense"],
 };
 
 export default function RootLayout({

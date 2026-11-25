@@ -6,7 +6,7 @@ import { WindIcon } from "./Icons";
 export function Footer() {
   return (
     <footer className="w-full border-t border-slate-200 bg-white mt-16 py-12 text-slate-600">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-8 border-b border-slate-100">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-500/20">
@@ -35,7 +35,7 @@ export function Footer() {
         <div className="pt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-slate-500">
           <p className="max-w-2xl leading-relaxed text-[11px] text-slate-500">
             <strong className="text-slate-800">Data Disclosure: </strong>
-            Air quality data is provided via Open-Meteo numerical atmospheric dispersion models (CAMS/NOAA) on a regional grid scale. Estimates reflect atmospheric dispersion rather than localized regulatory ground sensor readings. Index values follow the US EPA AQI standard and differ from India&apos;s National AQI (NAQI). Recommendations are intended for educational and preventive wellness awareness.
+            Air quality data is provided by the Open-Meteo API using CAMS European or CAMS Global model forecasts, depending on location. These grid estimates are not readings from a nearby ground sensor. Index values use the US EPA AQI scale and differ from India&apos;s National AQI (NAQI). Recommendations are for general information.
           </p>
 
           <div className="text-[11px] font-mono text-slate-400 shrink-0">

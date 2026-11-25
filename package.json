@@ -2,6 +2,11 @@
   "name": "smogsense",
   "version": "0.1.0",
   "private": true,
+  "description": "Real-time air quality forecasts and health advisories.",
+  "keywords": [
+    "air-quality",
+    "smogsense"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
